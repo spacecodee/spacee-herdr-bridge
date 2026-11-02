@@ -114,13 +114,21 @@ func (a *Auth) SessionHandler() http.Handler {
 	})
 }
 
+// SameOrigin reports whether the request has no Origin header or one whose
+// host is the host being requested.
+func SameOrigin(r *http.Request) bool {
+	o := r.Header.Get("Origin")
+	if o == "" {
+		return true
+	}
+	u, err := url.Parse(o)
+	return err == nil && strings.EqualFold(u.Host, r.Host)
+}
+
 func (a *Auth) login(w http.ResponseWriter, r *http.Request) {
-	if o := r.Header.Get("Origin"); o != "" {
-		u, err := url.Parse(o)
-		if err != nil || !strings.EqualFold(u.Host, r.Host) {
-			http.Error(w, "forbidden", http.StatusForbidden)
-			return
-		}
+	if !SameOrigin(r) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
 	}
 	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxLoginBody))
 	var req struct {

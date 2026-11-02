@@ -18,6 +18,8 @@ The web client served by the bridge has its own changelog in `spacee-herdr-front
 - Docker image and Compose file: runs as the host user, publishes only on host loopback (`127.0.0.1:8080`), mounts the core socket directory and the token directory, restarts with Docker.
 - Host setup guide (`docs/host-setup.md`): tailnet settings, tailnet policy with tests that keep tagged machines (the VPS) away from the host, `tailscale serve` (tailnet only, no Funnel), iPhone login, verification table, token rotation, migration to a new machine, troubleshooting.
 
+- Web Push: the bridge watches core's `events.subscribe` stream and sends a push (Angular service worker format, TTL 1 h) when a terminal's agent becomes `blocked` ("Needs you", high urgency) or `done`, or a terminal exits or loses its connection. Only transitions notify (never snapshots or reconnects), at most one per terminal per 10 s, and no terminal output is ever included. VAPID keys are created on first start in `~/.config/spacee-herdr/vapid.json` and subscriptions kept in `push.json` (both 0600, at most 10 browsers; an unreadable `push.json` is renamed to `push.json.corrupt-<unix-seconds>` and the bridge starts with no subscriptions, an unreadable `vapid.json` stops it). New authenticated endpoints `GET /api/push/key`, `POST`/`DELETE /api/push/subscription` and `POST /api/push/test`; new flag `-push-subject`. Uses `github.com/SherClockHolmes/webpush-go` for VAPID signing and RFC 8291 encryption.
+
 ### Changed
 
 - The bridge runs as a Docker Compose service instead of a systemd user service; update with `docker compose up -d --build`.
