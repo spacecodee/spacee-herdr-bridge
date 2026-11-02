@@ -1,0 +1,101 @@
+{
+  "configVersion": 1,
+  "timestamp": 1793659524742,
+  "index": "/index.html",
+  "assetGroups": [
+    {
+      "name": "app",
+      "installMode": "prefetch",
+      "updateMode": "prefetch",
+      "cacheQueryOptions": {
+        "ignoreVary": true
+      },
+      "urls": [
+        "/chunk-2D1Kv2KB.js",
+        "/chunk-B1DCPbp6.js",
+        "/chunk-Bgzsj9hp.js",
+        "/chunk-DLX4Cdy2.js",
+        "/chunk-DOsYNcHw.js",
+        "/chunk-vumppDBK.js",
+        "/favicon.ico",
+        "/icons/apple-touch-icon.png",
+        "/icons/favicon-32.png",
+        "/icons/icon-192.png",
+        "/icons/icon-512.png",
+        "/icons/icon-maskable-512.png",
+        "/icons/icon.svg",
+        "/index.html",
+        "/main-33IPHZLW.js",
+        "/manifest.webmanifest",
+        "/styles-RNL3ZZVZ.css"
+      ],
+      "patterns": []
+    },
+    {
+      "name": "fonts",
+      "installMode": "lazy",
+      "updateMode": "prefetch",
+      "cacheQueryOptions": {
+        "ignoreVary": true
+      },
+      "urls": [
+        "/fonts/JetBrainsMonoNFM-Bold.woff2",
+        "/fonts/JetBrainsMonoNFM-Regular.woff2"
+      ],
+      "patterns": []
+    }
+  ],
+  "dataGroups": [],
+  "hashTable": {
+    "/chunk-2D1Kv2KB.js": "b95219d1f577ac6b7da8904091aa2060ab0408c6",
+    "/chunk-B1DCPbp6.js": "08ccea785d2d0f0708b3b4c03fb0db65b8de95b5",
+    "/chunk-Bgzsj9hp.js": "0d7805a09270d63a2aa48f17b57e484fa1020605",
+    "/chunk-DLX4Cdy2.js": "c73f1d2d4cababf1fcf219e5a9f08509b51da6b0",
+    "/chunk-DOsYNcHw.js": "0898c8219daed6606a629f95ed9c1faa80f7e7d6",
+    "/chunk-vumppDBK.js": "0f312f4f624bffce9392f3138e20c13a593d5562",
+    "/favicon.ico": "73e26c0c4b1ba7f970aca2cdba6993838d6a2a65",
+    "/fonts/JetBrainsMonoNFM-Bold.woff2": "fa1465f712764bf20313aba822eeadc570bc8418",
+    "/fonts/JetBrainsMonoNFM-Regular.woff2": "a96f1548b18840db5606e766793c61e15434a248",
+    "/icons/apple-touch-icon.png": "8271c3aa25cf9956ed9443ef396a869eb0dd2d87",
+    "/icons/favicon-32.png": "eb02fbc9a68e6e63ae3deff2165ea4bfeeb75c88",
+    "/icons/icon-192.png": "19a59cbfa91a41e1bf5dfb0bbdd5225dfbea0c68",
+    "/icons/icon-512.png": "afd59b88f2b22de0a0271ba0f7b7c5c26877a997",
+    "/icons/icon-maskable-512.png": "afd59b88f2b22de0a0271ba0f7b7c5c26877a997",
+    "/icons/icon.svg": "b8981656ec5f78657aa4679a5df5db5135a5f188",
+    "/index.html": "c3869939123c96d37fac1ceada04601e4cfd818c",
+    "/main-33IPHZLW.js": "f7033355b769f23452c851cf9dc4e58f6dabd8d2",
+    "/manifest.webmanifest": "ea9f1e148352b370ef9d414b3e81e4d87ac981e1",
+    "/styles-RNL3ZZVZ.css": "b4bd39c31a7d7f4279f2ca902db756551fde900c"
+  },
+  "navigationUrls": [
+    {
+      "positive": true,
+      "regex": "^\\/.*$"
+    },
+    {
+      "positive": false,
+      "regex": "^\\/(?:.+\\/)?[^/]*\\.[^/]*$"
+    },
+    {
+      "positive": false,
+      "regex": "^\\/(?:.+\\/)?[^/]*__[^/]*$"
+    },
+    {
+      "positive": false,
+      "regex": "^\\/(?:.+\\/)?[^/]*__[^/]*\\/.*$"
+    },
+    {
+      "positive": false,
+      "regex": "^\\/api\\/.*$"
+    },
+    {
+      "positive": false,
+      "regex": "^\\/ws$"
+    },
+    {
+      "positive": false,
+      "regex": "^\\/healthz$"
+    }
+  ],
+  "navigationRequestStrategy": "performance"
+}

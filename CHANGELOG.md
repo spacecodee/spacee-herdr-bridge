@@ -22,4 +22,8 @@ The web client served by the bridge has its own changelog in `spacee-herdr-front
 
 - The bridge runs as a Docker Compose service instead of a systemd user service; update with `docker compose up -d --build`.
 
+### Fixed
+
+- PWA serving: a missing file (`/ngsw.json`, `/nope.js`) now returns 404 instead of `index.html`; only extensionless app routes fall back to the SPA. `.webmanifest` is served as `application/manifest+json`, and cache headers are set (`no-cache` for `index.html`, the service worker and the manifest; immutable for hashed build files; one day for icons and fonts) so updates reach installed apps.
+
 [unreleased]: https://github.com/spacecodee/spacee-herdr-bridge/commits/main
