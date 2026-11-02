@@ -1,4 +1,4 @@
-module github.com/usuario/spacee-herdr-app/spacee-herdr-bridge
+module github.com/spacecodee/spacee-herdr-bridge
 
 go 1.27.2
 

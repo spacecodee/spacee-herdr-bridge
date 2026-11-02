@@ -6,9 +6,9 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/usuario/spacee-herdr-app/spacee-herdr-bridge/internal/auth"
-	"github.com/usuario/spacee-herdr-app/spacee-herdr-bridge/internal/coreproxy"
-	"github.com/usuario/spacee-herdr-app/spacee-herdr-bridge/internal/webui"
+	"github.com/spacecodee/spacee-herdr-bridge/internal/auth"
+	"github.com/spacecodee/spacee-herdr-bridge/internal/coreproxy"
+	"github.com/spacecodee/spacee-herdr-bridge/internal/webui"
 )
 
 func main() {

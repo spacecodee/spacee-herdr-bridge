@@ -15,7 +15,7 @@ import (
 
 	"github.com/coder/websocket"
 
-	"github.com/usuario/spacee-herdr-app/spacee-herdr-bridge/internal/auth"
+	"github.com/spacecodee/spacee-herdr-bridge/internal/auth"
 )
 
 func sockPath(t *testing.T) string {
