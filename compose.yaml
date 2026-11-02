@@ -9,6 +9,9 @@ services:
     environment:
       XDG_RUNTIME_DIR: /run/user/${UID:-1000}
       XDG_CONFIG_HOME: /config
+    # Appended to the image entrypoint. Same absolute path inside and outside the container, so the
+    # path the bridge returns for an uploaded image is valid on the host, where the agents run.
+    command: ["-upload-dir", "${HOME}/.cache/spacee-herdr/uploads"]
     ports:
       # Host loopback only: the single way in is `tailscale serve` on the host.
       - "127.0.0.1:8080:8080"
@@ -25,5 +28,11 @@ services:
       - type: bind
         source: ${HOME}/.config/spacee-herdr
         target: /config/spacee-herdr
+        bind:
+          create_host_path: false
+      # Uploaded images, mounted at the same absolute path as on the host; create it before the first start.
+      - type: bind
+        source: ${HOME}/.cache/spacee-herdr/uploads
+        target: ${HOME}/.cache/spacee-herdr/uploads
         bind:
           create_host_path: false

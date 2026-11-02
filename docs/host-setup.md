@@ -121,6 +121,7 @@ What `compose.yaml` does:
 - mounts `/run/user` read-only with `rslave` propagation, so it sees core's socket even when
   `/run/user/<uid>` is mounted after Docker starts at boot, and when hc recreates it;
 - mounts `~/.config/spacee-herdr` for the token;
+- mounts `~/.cache/spacee-herdr/uploads` at the same absolute path, for images uploaded from the phone;
 - publishes port 8080 on host loopback only (`127.0.0.1:8080`). Never change it to
   `8080:8080` or a tailnet IP: Docker's published ports bypass `ufw`, and the only way in
   must be `tailscale serve`;
@@ -131,10 +132,15 @@ The image embeds the frontend build committed in `internal/webui/dist`.
 ```sh
 cd ~/Development/fullstack/spacee-herdr-app/spacee-herdr-bridge
 install -d -m 700 ~/.config/spacee-herdr   # must exist and be yours before the first start
+install -d -m 700 ~/.cache/spacee-herdr/uploads   # images sent from the phone; same rule
 docker compose up -d --build
 docker compose ps                          # Up, 127.0.0.1:8080->8080/tcp
 curl -s http://127.0.0.1:8080/healthz      # ok
 ```
+
+`~/.cache/spacee-herdr/uploads` holds the images you send from the phone to agents (PNG, JPEG,
+WebP, GIF, at most 15 MiB, mode 0600). The bridge returns their path on the host, which is
+where the agents read them. Files older than 7 days are deleted at startup and then hourly.
 
 On first start the bridge creates the token at `~/.config/spacee-herdr/token` (mode 0600).
 To keep the token when moving to a new machine, copy that file (mode 0600) before the first
