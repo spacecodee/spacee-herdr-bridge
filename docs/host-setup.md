@@ -5,12 +5,12 @@ only by your own devices on the tailnet. Nothing is exposed to the internet, and
 machines such as the Dokploy VPS cannot reach it.
 
 ```
-iPhone (Tailscale app) --https--> workstation:443 (tailscale serve) --> 127.0.0.1:8080 (bridge) --> hc socket
+iPhone (Tailscale app) --https--> workstation:443 (tailscale serve) --> 127.0.0.1:8080 (bridge container) --> hc socket
 ```
 
 | Piece | Listens on | Who can reach it |
 | --- | --- | --- |
-| bridge | `127.0.0.1:8080` | only processes on workstation |
+| bridge (Docker container) | published on host `127.0.0.1:8080` | only processes on workstation |
 | `tailscale serve` | workstation tailnet address, port 443 | devices allowed by the tailnet policy: your own (`autogroup:member`) |
 | herdr-core (`hc`) | Unix socket `/run/user/<uid>/herdr-core/default.sock` | only your user on workstation |
 
@@ -31,11 +31,12 @@ Follow the steps in order. Commands run on workstation unless a step says otherw
 ```sh
 hc ls                     # herdr-core answers (it runs as systemd user units hc-serve-*)
 tailscale status          # workstation is logged in to the tailnet
-loginctl show-user "$USER" -p Linger   # must print Linger=yes (see step 5)
-go version                # to build the bridge
+loginctl show-user "$USER" -p Linger   # must print Linger=yes
+docker compose version    # Docker Engine with the Compose plugin
 ```
 
-If `Linger` is `no`, enable it so user services keep running without an open session:
+If `Linger` is `no`, enable it so herdr-core and its socket directory (`/run/user/<uid>`)
+exist at boot without an open session:
 
 ```sh
 sudo loginctl enable-linger "$USER"
@@ -107,52 +108,47 @@ Add tests so a future edit cannot open workstation to tagged machines without fa
 Save. If Tailscale rejects it, a grant lets a tagged machine reach workstation: fix the grant, do
 not delete the test.
 
-## 4. Build the bridge
+## 4. Run the bridge container
+
+Only the bridge runs in a container. herdr-core stays on the host: its terminals must be
+shells on workstation, with your files and tools. The container gets no extra isolation from
+this: it holds core's socket, which is a shell on the host.
+
+What `compose.yaml` does:
+
+- runs as your host user (uid/gid 1000 by default; export `UID`/`GID` if yours differ), so
+  it can use core's socket and own the token file;
+- mounts `/run/user` read-only with `rslave` propagation, so it sees core's socket even when
+  `/run/user/<uid>` is mounted after Docker starts at boot, and when hc recreates it;
+- mounts `~/.config/spacee-herdr` for the token;
+- publishes port 8080 on host loopback only (`127.0.0.1:8080`). Never change it to
+  `8080:8080` or a tailnet IP: Docker's published ports bypass `ufw`, and the only way in
+  must be `tailscale serve`;
+- restarts with Docker (`restart: unless-stopped`), including after a reboot.
+
+The image embeds the frontend build committed in `internal/webui/dist`.
 
 ```sh
 cd ~/Development/fullstack/spacee-herdr-app/spacee-herdr-bridge
-go vet ./... && go test ./...
-go build -o bin/bridge ./cmd/bridge
-```
-
-The frontend is already embedded (`internal/webui/dist`). To ship a newer frontend first:
-
-```sh
-(cd ../spacee-herdr-frontend && pnpm build)
-rm -rf internal/webui/dist/* && cp -R ../spacee-herdr-frontend/dist/spacee-herdr-frontend/browser/. internal/webui/dist/
-go build -o bin/bridge ./cmd/bridge
-```
-
-## 5. Run the bridge as a user service
-
-Same model as herdr-core: a systemd user unit, so it survives reboots and logouts.
-
-Create `~/.config/systemd/user/spacee-herdr-bridge.service`:
-
-```ini
-[Unit]
-Description=spacee-herdr bridge (web client for herdr-core)
-
-[Service]
-ExecStart=%h/Development/fullstack/spacee-herdr-app/spacee-herdr-bridge/bin/bridge
-Restart=on-failure
-
-[Install]
-WantedBy=default.target
-```
-
-Keep the default `-listen 127.0.0.1:8080`. Never pass `0.0.0.0` or the tailnet IP: the only
-way in must be `tailscale serve`.
-
-```sh
-systemctl --user daemon-reload
-systemctl --user enable --now spacee-herdr-bridge
-systemctl --user status spacee-herdr-bridge
+install -d -m 700 ~/.config/spacee-herdr   # must exist and be yours before the first start
+docker compose up -d --build
+docker compose ps                          # Up, 127.0.0.1:8080->8080/tcp
 curl -s http://127.0.0.1:8080/healthz      # ok
 ```
 
 On first start the bridge creates the token at `~/.config/spacee-herdr/token` (mode 0600).
-The core socket is detected automatically.
+To keep the token when moving to a new machine, copy that file (mode 0600) before the first
+start; otherwise log in again with the new one.
+
+## 5. Ship a newer frontend
+
+The frontend is embedded at build time. After a frontend change:
+
+```sh
+(cd ../spacee-herdr-frontend && pnpm build)
+rm -rf internal/webui/dist/* && cp -R ../spacee-herdr-frontend/dist/spacee-herdr-frontend/browser/. internal/webui/dist/
+docker compose up -d --build
+```
 
 ## 6. Publish to the tailnet with `tailscale serve`
 
@@ -202,19 +198,20 @@ step 3 before using the bridge.
 
 ## Maintenance
 
-- **Update**: pull, rebuild (step 4), then `systemctl --user restart spacee-herdr-bridge`.
-- **Logs**: `journalctl --user -u spacee-herdr-bridge -f`. The bridge never logs tokens or
-  terminal data.
+- **Update**: `git pull && docker compose up -d --build`.
+- **Logs**: `docker compose logs -f`. The bridge never logs tokens or terminal data.
 - **Rotate the token** (lost phone, token leaked): delete the file and restart. The old
   cookie stops working at once; log in again with the new token.
   ```sh
   rm ~/.config/spacee-herdr/token
-  systemctl --user restart spacee-herdr-bridge
+  docker compose restart
   ```
   Also remove the lost device from the tailnet in the admin console.
 - **Stop publishing**: `tailscale serve reset` (clears every serve rule on workstation).
-- **Remove the service**: `systemctl --user disable --now spacee-herdr-bridge` and delete the
-  unit file.
+- **Remove the bridge**: `docker compose down`.
+- **New or reinstalled machine**: install herdr-core, Tailscale (log in) and Docker, enable
+  linger, clone this repo, then steps 4 and 6. The tailnet settings and policy (steps 2-3)
+  live in the admin console; update the workstation IP in the policy tests if it changed.
 
 ## Troubleshooting
 
@@ -225,4 +222,8 @@ step 3 before using the bridge.
 - **Login returns 403**: the request `Origin` does not match the host. Open the bridge by the
   same name it is served on, not through another proxy or address.
 - **Terminal list empty or errors**: `hc ls` on workstation; check that `hc-serve-*` is running
-  (`systemctl --user list-units 'hc-*'`).
+  (`systemctl --user list-units 'hc-*'`). `docker compose logs` printing `core unavailable`
+  means the container cannot reach the socket: check `UID` and that
+  `/run/user/<uid>/herdr-core/default.sock` exists.
+- **Container fails to start with a bind-mount error**: `~/.config/spacee-herdr` does not
+  exist; create it (step 4).

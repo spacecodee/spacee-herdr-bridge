@@ -1,0 +1,29 @@
+# Runs the bridge on the host that runs herdr-core (hc). See docs/host-setup.md.
+services:
+  bridge:
+    build: .
+    image: spacee-herdr-bridge
+    restart: unless-stopped
+    # Your host user: it must own the hc socket and the token file.
+    user: "${UID:-1000}:${GID:-1000}"
+    environment:
+      XDG_RUNTIME_DIR: /run/user/${UID:-1000}
+      XDG_CONFIG_HOME: /config
+    ports:
+      # Host loopback only: the single way in is `tailscale serve` on the host.
+      - "127.0.0.1:8080:8080"
+    volumes:
+      # The whole /run/user, read-only, with rslave propagation: /run/user/<uid> is a tmpfs
+      # that may be mounted after Docker starts at boot, and hc recreates its socket on restart.
+      - type: bind
+        source: /run/user
+        target: /run/user
+        read_only: true
+        bind:
+          propagation: rslave
+      # Token file (~/.config/spacee-herdr/token); create the directory before the first start.
+      - type: bind
+        source: ${HOME}/.config/spacee-herdr
+        target: /config/spacee-herdr
+        bind:
+          create_host_path: false
