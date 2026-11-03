@@ -203,6 +203,7 @@ func (s *session) poll() {
 		return
 	}
 	added, updated := s.tail.Builder().Drain()
+	gone := s.tail.Builder().Gone()
 	if reset {
 		s.event("reset", map[string]any{"agent": s.src.Agent, "session": s.src.Session, "messages": s.tail.Builder().Snapshot(snapshotSize)})
 		return
@@ -212,6 +213,9 @@ func (s *session) poll() {
 	}
 	if len(updated) > 0 {
 		s.event("update", map[string]any{"messages": updated})
+	}
+	if len(gone) > 0 {
+		s.event("remove", map[string]any{"ids": gone})
 	}
 }
 

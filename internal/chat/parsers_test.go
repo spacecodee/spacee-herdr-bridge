@@ -201,6 +201,76 @@ func TestCodexMessages(t *testing.T) {
 	}
 }
 
+func TestClaudeQueuedMessageShowsUntilDelivered(t *testing.T) {
+	b := feed(claudeParser{},
+		`{"type":"user","uuid":"u1","timestamp":"2026-11-03T10:00:00Z","message":{"role":"user","content":"start"}}`,
+		`{"type":"queue-operation","operation":"enqueue","timestamp":"2026-11-03T10:00:05Z","sessionId":"s","content":"also check the docs"}`,
+	)
+	got := snap(b)
+	if len(got) != 2 {
+		t.Fatalf("messages = %d, want 2 (user + queued)", len(got))
+	}
+	q := got[1]
+	if q.Role != "user" || !q.Queued || q.Parts[0].Text != "also check the docs" || q.Time != "2026-11-03T10:00:05Z" {
+		t.Fatalf("queued message = %+v", q)
+	}
+	b.Drain()
+	b.Gone()
+
+	// Delivered mid-turn: the queued entry goes away and the prompt is a normal user message.
+	claudeParser{}.Line([]byte(`{"type":"attachment","uuid":"att1","timestamp":"2026-11-03T10:00:09Z","attachment":{"type":"queued_command","prompt":"also check the docs","commandMode":"prompt","origin":{"kind":"human"}}}`), b)
+	claudeParser{}.Line([]byte(`{"type":"queue-operation","operation":"remove","timestamp":"2026-11-03T10:00:09Z","sessionId":"s","content":"also check the docs"}`), b)
+	added, _ := b.Drain()
+	if len(added) != 1 || added[0].ID != "att1" || added[0].Role != "user" || added[0].Queued || added[0].Parts[0].Text != "also check the docs" {
+		t.Fatalf("added = %+v, want the delivered prompt", added)
+	}
+	if gone := b.Gone(); len(gone) != 1 || gone[0] != q.ID {
+		t.Fatalf("gone = %v, want [%s]", gone, q.ID)
+	}
+	if n := len(snap(b)); n != 2 {
+		t.Errorf("messages after delivery = %d, want 2", n)
+	}
+}
+
+func TestClaudeDequeuePopsTheOldestQueued(t *testing.T) {
+	b := feed(claudeParser{},
+		`{"type":"queue-operation","operation":"enqueue","timestamp":"t1","content":"first"}`,
+		`{"type":"queue-operation","operation":"enqueue","timestamp":"t2","content":"second"}`,
+		`{"type":"queue-operation","operation":"dequeue","timestamp":"t3"}`,
+	)
+	got := snap(b)
+	if len(got) != 1 || got[0].Parts[0].Text != "second" || !got[0].Queued {
+		t.Fatalf("left = %+v, want only the queued second", got)
+	}
+}
+
+func TestClaudeTaskNotificationsAreNotShownAsQueued(t *testing.T) {
+	b := feed(claudeParser{},
+		`{"type":"queue-operation","operation":"enqueue","timestamp":"t1","content":"<task-notification>\n<task-id>x</task-id>"}`,
+		`{"type":"queue-operation","operation":"enqueue","timestamp":"t2","content":"mine"}`,
+		`{"type":"attachment","uuid":"att","attachment":{"type":"queued_command","prompt":"<task-notification>x","commandMode":"task-notification"}}`,
+		// The notification leaves the queue first; "mine" must stay.
+		`{"type":"queue-operation","operation":"dequeue","timestamp":"t3"}`,
+	)
+	got := snap(b)
+	if len(got) != 1 || got[0].Parts[0].Text != "mine" || !got[0].Queued {
+		t.Fatalf("messages = %+v, want only the queued \"mine\"", got)
+	}
+}
+
+func TestBuilderRemovingAnUnseenMessageIsNotReported(t *testing.T) {
+	b := NewBuilder(10)
+	b.Enqueue("x", Message{Role: "user", Parts: []Part{{Type: "text", Text: "x"}}})
+	b.Dequeue("")
+	added, upd := b.Drain()
+	if len(added)+len(upd) != 0 {
+		t.Errorf("added=%+v updated=%+v, want nothing", added, upd)
+	}
+	if gone := b.Gone(); len(gone) != 0 {
+		t.Errorf("gone = %v, want none (the client never saw it)", gone)
+	}
+}
+
 // --- builder ---
 
 func TestBuilderAddedThenUpdatedInOneBatchIsAdded(t *testing.T) {

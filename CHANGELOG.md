@@ -9,6 +9,10 @@ The web client served by the bridge has its own changelog in `spacee-herdr-front
 
 ## [Unreleased]
 
+### Added
+
+- Chat transcripts show Claude Code messages typed while the agent was working: a message waiting in Claude's queue is sent with `queued: true` and removed through a new `remove` SSE event (`{"ids": [...]}`) once Claude takes it; a queued message delivered in the middle of a turn is now kept as a user message (it used to be missing from the chat). Background task notifications in the queue are not shown.
+
 ## [1.0.0] - 2026-11-02
 
 ### Added

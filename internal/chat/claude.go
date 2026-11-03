@@ -1,6 +1,9 @@
 package chat
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"strings"
+)
 
 // claudeParser reads Claude Code transcripts (~/.claude/projects/<dir>/<session>.jsonl).
 type claudeParser struct{}
@@ -26,7 +29,13 @@ func (claudeParser) Line(line []byte, b *Builder) {
 		IsSidechain bool            `json:"isSidechain"`
 		Level       string          `json:"level"`
 		Content     json.RawMessage `json:"content"`
-		Message     struct {
+		Operation   string          `json:"operation"`
+		Attachment  struct {
+			Type        string `json:"type"`
+			Prompt      string `json:"prompt"`
+			CommandMode string `json:"commandMode"`
+		} `json:"attachment"`
+		Message struct {
 			ID      string          `json:"id"`
 			Content json.RawMessage `json:"content"`
 		} `json:"message"`
@@ -35,6 +44,25 @@ func (claudeParser) Line(line []byte, b *Builder) {
 		return
 	}
 	switch r.Type {
+	case "queue-operation":
+		// Messages typed while Claude works wait here until it takes them.
+		text := contentText(r.Content)
+		switch r.Operation {
+		case "enqueue":
+			m := Message{Role: "user", Time: r.Timestamp}
+			if !blank(text) && !strings.HasPrefix(text, "<task-notification>") {
+				m.Parts = []Part{textPart("text", text)}
+			}
+			b.Enqueue(text, m)
+		case "dequeue", "remove":
+			b.Dequeue(text)
+		}
+	case "attachment":
+		// A queued message delivered in the middle of a turn (one taken at a turn's start is
+		// written as a plain user message instead).
+		if a := r.Attachment; a.Type == "queued_command" && a.CommandMode == "prompt" && !blank(a.Prompt) {
+			b.Add(Message{ID: r.UUID, Role: "user", Time: r.Timestamp, Parts: []Part{textPart("text", a.Prompt)}})
+		}
 	case "system":
 		if r.Level != "error" {
 			return

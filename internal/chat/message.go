@@ -5,6 +5,7 @@ package chat
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"unicode/utf8"
 )
@@ -36,6 +37,8 @@ type Message struct {
 	Role  string `json:"role"` // user, assistant, system
 	Time  string `json:"time,omitempty"`
 	Parts []Part `json:"parts"`
+	// Queued is a user message typed while the agent was busy and not delivered yet.
+	Queued bool `json:"queued,omitempty"`
 }
 
 // Parser turns one transcript line into builder calls. Unknown or malformed lines are ignored.
@@ -160,6 +163,16 @@ type Builder struct {
 	tools map[string]toolRef
 	fresh map[string]bool // added since the last Drain
 	dirty map[string]bool // changed since the last Drain
+	gone  []string        // removed since the last Gone, after the client saw them
+	queue []queued        // the agent's input queue, oldest first
+	qseq  int
+}
+
+// queued is one entry of the agent's input queue. Hidden entries (not typed by the user)
+// keep their place so a dequeue still pops the right one, but have no message.
+type queued struct {
+	id, text string
+	shown    bool
 }
 
 func NewBuilder(max int) *Builder {
@@ -175,6 +188,74 @@ func (b *Builder) Reset() {
 	b.tools = map[string]toolRef{}
 	b.fresh = map[string]bool{}
 	b.dirty = map[string]bool{}
+	b.gone = nil
+	b.queue = nil
+	b.qseq = 0
+}
+
+// Enqueue adds an entry to the agent's input queue; text is its raw content, used to match
+// a later Dequeue. With parts it is shown as a queued message (its ID is assigned here);
+// without parts it only holds its place in the queue.
+func (b *Builder) Enqueue(text string, m Message) {
+	b.qseq++
+	q := queued{id: fmt.Sprintf("queued-%d", b.qseq), text: text, shown: len(m.Parts) > 0}
+	b.queue = append(b.queue, q)
+	if q.shown {
+		m.ID, m.Queued = q.id, true
+		b.Add(m)
+	}
+}
+
+// Dequeue takes the entry whose text is text out of the queue, or the oldest one when text
+// is empty or matches none, and removes its queued message.
+func (b *Builder) Dequeue(text string) {
+	if len(b.queue) == 0 {
+		return
+	}
+	at := 0
+	if text != "" {
+		for i, q := range b.queue {
+			if q.text == text {
+				at = i
+				break
+			}
+		}
+	}
+	q := b.queue[at]
+	b.queue = append(b.queue[:at], b.queue[at+1:]...)
+	if q.shown {
+		b.remove(q.id)
+	}
+}
+
+// Gone returns the IDs of messages removed since the previous call that the client had
+// already been sent. A message added and removed between two drains is never reported.
+func (b *Builder) Gone() []string {
+	g := b.gone
+	b.gone = nil
+	return g
+}
+
+func (b *Builder) remove(id string) {
+	cur := b.byID[id]
+	if cur == nil {
+		return
+	}
+	for i, m := range b.msgs {
+		if m == cur {
+			b.msgs = append(b.msgs[:i], b.msgs[i+1:]...)
+			break
+		}
+	}
+	for _, p := range cur.Parts {
+		delete(b.tools, p.ID)
+	}
+	if !b.fresh[id] {
+		b.gone = append(b.gone, id)
+	}
+	delete(b.byID, id)
+	delete(b.fresh, id)
+	delete(b.dirty, id)
 }
 
 // Add appends a message, or appends the parts of a message with the same ID (an assistant
@@ -185,7 +266,7 @@ func (b *Builder) Add(m Message) {
 	}
 	cur := b.byID[m.ID]
 	if cur == nil {
-		cur = &Message{ID: m.ID, Role: m.Role, Time: m.Time}
+		cur = &Message{ID: m.ID, Role: m.Role, Time: m.Time, Queued: m.Queued}
 		b.msgs = append(b.msgs, cur)
 		b.byID[m.ID] = cur
 		b.fresh[m.ID] = true

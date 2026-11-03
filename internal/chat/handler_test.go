@@ -173,6 +173,30 @@ func TestStreamResetAppendUpdate(t *testing.T) {
 	}
 }
 
+func TestStreamQueuedMessageAppendedThenRemoved(t *testing.T) {
+	srv, f := newChatServer(t, 8)
+	path := tmpTranscript(t, userLine("u1", "hi"))
+	f.set(claudeSource(path), "")
+
+	s := openStream(t, srv.URL+"/api/chat?terminal=t16", "")
+	s.expect(t, "reset")
+
+	appendTo(t, path, `{"type":"queue-operation","operation":"enqueue","timestamp":"t","content":"later"}`+"\n")
+	f.fire(t, f.poll)
+	app := s.expect(t, "append")
+	got := app["messages"].([]any)[0].(map[string]any)
+	if got["queued"] != true || got["id"] != "queued-1" {
+		t.Fatalf("append = %v", app)
+	}
+
+	appendTo(t, path, `{"type":"queue-operation","operation":"dequeue","timestamp":"t2"}`+"\n")
+	f.fire(t, f.poll)
+	rm := s.expect(t, "remove")
+	if ids := rm["ids"].([]any); len(ids) != 1 || ids[0] != "queued-1" {
+		t.Fatalf("remove = %v", rm)
+	}
+}
+
 func TestStreamSessionSwitchSendsReset(t *testing.T) {
 	srv, f := newChatServer(t, 8)
 	a := tmpTranscript(t, userLine("a1", "old"))
