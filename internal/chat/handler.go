@@ -105,6 +105,20 @@ func realTicks(kind string) (<-chan time.Time, func()) {
 	return t.C, t.Stop
 }
 
+// follower keeps a Builder in sync with a transcript: a JSONL file (Tailer) or an
+// opencode session (ocFollower). reset is true when the Builder was rebuilt.
+type follower interface {
+	Poll() (reset bool, err error)
+	Builder() *Builder
+}
+
+func (src Source) follow() follower {
+	if src.DB != nil {
+		return newOCFollower(src.DB, src.Session)
+	}
+	return NewTailer(src.Path, src.Parser, NewBuilder(keep))
+}
+
 // session is one open SSE connection following one terminal.
 type session struct {
 	w       http.ResponseWriter
@@ -113,7 +127,7 @@ type session struct {
 	address string
 
 	src      *Source
-	tail     *Tailer
+	tail     follower
 	lastNone string
 	err      error // first write error: the client is gone
 }
@@ -161,7 +175,7 @@ func (s *session) refresh() {
 	s.lastNone = ""
 	if s.src == nil || s.src.Path != src.Path {
 		s.src = &src
-		s.tail = NewTailer(src.Path, src.Parser, NewBuilder(keep))
+		s.tail = src.follow()
 	}
 }
 
@@ -188,9 +202,9 @@ func (s *session) poll() {
 		s.drop(NotFound)
 		return
 	}
-	added, updated := s.tail.B.Drain()
+	added, updated := s.tail.Builder().Drain()
 	if reset {
-		s.event("reset", map[string]any{"agent": s.src.Agent, "session": s.src.Session, "messages": s.tail.B.Snapshot(snapshotSize)})
+		s.event("reset", map[string]any{"agent": s.src.Agent, "session": s.src.Session, "messages": s.tail.Builder().Snapshot(snapshotSize)})
 		return
 	}
 	if len(added) > 0 {

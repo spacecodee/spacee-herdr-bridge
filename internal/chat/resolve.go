@@ -3,6 +3,7 @@ package chat
 import (
 	"bufio"
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -26,6 +27,7 @@ type Source struct {
 	Session string
 	Path    string
 	Parser  Parser
+	DB      *sql.DB // opencode: the session lives in this database, not in Path/Parser
 }
 
 // Why nothing is shown (the reason of an SSE "none" event).
@@ -42,6 +44,8 @@ type Resolver struct {
 	Home string
 	Now  func() time.Time
 
+	OpenCode string // opencode database; default <Home>/.local/share/opencode/opencode.db
+
 	procs map[int]proc // set by Snapshot
 }
 
@@ -57,7 +61,7 @@ const clockTicks = 100 // USER_HZ on Linux
 var (
 	sessionID  = regexp.MustCompile(`^[A-Za-z0-9_-]{1,80}$`)
 	nonAlnum   = regexp.MustCompile(`[^A-Za-z0-9]`)
-	supported  = map[string]bool{"claude": true, "pi": true, "codex": true}
+	supported  = map[string]bool{"claude": true, "pi": true, "codex": true, "opencode": true}
 	known      = map[string]bool{"claude": true, "pi": true, "codex": true, "opencode": true, "agy": true}
 	interpPref = map[string]bool{"node": true, "bun": true, "deno": true, "npx": true}
 )
@@ -99,6 +103,8 @@ func (r Resolver) Resolve(t Terminal) (Source, string) {
 			src, ok = r.pi(p, t.CWD)
 		case "codex":
 			src, ok = r.codex(p, t.CWD)
+		case "opencode":
+			src, ok = r.opencode(t.CWD)
 		}
 		if ok {
 			return src, ""

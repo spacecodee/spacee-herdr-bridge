@@ -200,6 +200,21 @@ func (b *Builder) Add(m Message) {
 	b.trim()
 }
 
+// Replace sets the parts of a message that is rewritten in place (a running tool
+// completing), or adds it when it is new. A client sees it as an update.
+func (b *Builder) Replace(m Message) {
+	if len(m.Parts) == 0 || m.ID == "" {
+		return
+	}
+	if cur := b.byID[m.ID]; cur != nil {
+		for _, p := range cur.Parts {
+			delete(b.tools, p.ID)
+		}
+		cur.Role, cur.Time, cur.Parts = m.Role, m.Time, nil
+	}
+	b.Add(m)
+}
+
 func (b *Builder) trim() {
 	for len(b.msgs) > b.max {
 		old := b.msgs[0]

@@ -79,6 +79,8 @@ func (t *Tailer) Poll() (reset bool, err error) {
 	return reset, nil
 }
 
+func (t *Tailer) Builder() *Builder { return t.B }
+
 func (t *Tailer) consume(data []byte) {
 	t.pending = append(t.pending, data...)
 	for {

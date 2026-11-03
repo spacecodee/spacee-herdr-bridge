@@ -122,8 +122,10 @@ What `compose.yaml` does:
   `/run/user/<uid>` is mounted after Docker starts at boot, and when hc recreates it;
 - mounts `~/.config/spacee-herdr` for the token;
 - mounts `~/.cache/spacee-herdr/uploads` at the same absolute path, for images uploaded from the phone;
-- mounts `~/.claude`, `~/.pi` and `~/.codex` read-only at the same absolute paths, so the chat
-  view (`/api/chat`) can read the agents' transcripts (they must exist before the first start);
+- mounts `~/.claude`, `~/.pi`, `~/.codex` and `~/.local/share/opencode` read-only at the same
+  absolute paths, so the chat view (`/api/chat`) can read the agents' transcripts (they must
+  exist before the first start; opencode's is a SQLite database opened read-only, which works on
+  the read-only mount while opencode is running because its `-shm`/`-wal` files exist then);
 - runs in the host PID namespace (`pid: host`), see "Chat transcripts" below;
 - publishes port 8080 on host loopback only (`127.0.0.1:8080`). Never change it to
   `8080:8080` or a tailnet IP: Docker's published ports bypass `ufw`, and the only way in
@@ -167,10 +169,11 @@ contain secrets passed as arguments; the bridge reads it only to match an agent 
 logs or returns it.
 
 Other safeguards: the bridge only opens files under `~/.claude`, `~/.pi` and `~/.codex`
-(symlinks resolved, anything outside refused), mounted read-only; it never logs message
+(symlinks resolved, anything outside refused) and the opencode database under
+`~/.local/share/opencode` (opened read-only, never written), all mounted read-only; it never logs message
 contents or paths; at most 8 chat streams at once (`429` beyond); and the endpoint needs the
 session cookie and a same-origin request like the rest of the API. Remote terminals
-(`machine/tN`) and other agents (opencode, agy) answer `none` for now.
+(`machine/tN`) and other agents (agy) answer `none` for now.
 
 On first start the bridge creates the token at `~/.config/spacee-herdr/token` (mode 0600).
 To keep the token when moving to a new machine, copy that file (mode 0600) before the first

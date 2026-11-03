@@ -59,3 +59,11 @@ services:
         read_only: true
         bind:
           create_host_path: false
+      # opencode keeps its sessions in SQLite (WAL). The directory is mounted, not the file, so the
+      # -wal/-shm files come along; the bridge opens the database read-only.
+      - type: bind
+        source: ${HOME}/.local/share/opencode
+        target: ${HOME}/.local/share/opencode
+        read_only: true
+        bind:
+          create_host_path: false

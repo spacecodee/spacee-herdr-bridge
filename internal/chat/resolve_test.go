@@ -168,8 +168,8 @@ func TestResolveReasons(t *testing.T) {
 		t.Errorf("shell only: %q", why)
 	}
 	f.proc_(t, 402, 400, 3, "/home/u/.opencode/bin/opencode")
-	if _, why := f.resolver().Resolve(Terminal{PID: 400}); why != "unsupported" {
-		t.Errorf("opencode: %q", why)
+	if _, why := f.resolver().Resolve(Terminal{PID: 400}); why != "not-found" {
+		t.Errorf("opencode without a database: %q", why)
 	}
 	f.proc_(t, 500, 1, 1, "agy", "--x")
 	if _, why := f.resolver().Resolve(Terminal{PID: 500}); why != "unsupported" {

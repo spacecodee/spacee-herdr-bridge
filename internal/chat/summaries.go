@@ -144,6 +144,9 @@ func lastTime(s Summary) string {
 }
 
 func (sm *Summarizer) summarize(src Source) (Summary, bool) {
+	if src.DB != nil {
+		return sm.summarizeDB(src)
+	}
 	fi, err := os.Stat(src.Path)
 	if err != nil || !fi.Mode().IsRegular() {
 		return Summary{}, false
@@ -172,12 +175,49 @@ func (sm *Summarizer) summarize(src Source) (Summary, bool) {
 		s.Title = firstTitle(headMessages(src, fi.Size()))
 	}
 	s.Last = lastMessage(msgs)
+	sm.store(src.Path, cached{size: fi.Size(), mod: fi.ModTime(), sum: s})
+	return s, true
+}
+
+func (sm *Summarizer) store(key string, c cached) {
 	sm.mu.Lock()
+	defer sm.mu.Unlock()
 	if len(sm.cache) >= maxCached {
 		sm.cache = map[string]cached{} // transcripts of finished sessions pile up; start over
 	}
-	sm.cache[src.Path] = cached{size: fi.Size(), mod: fi.ModTime(), sum: s}
+	sm.cache[key] = c
+}
+
+// summarizeDB is summarize for an opencode session. The cache stamp is the number of
+// rows and the newest update time of the session.
+func (sm *Summarizer) summarizeDB(src Source) (Summary, bool) {
+	var n, upd int64
+	if err := src.DB.QueryRow(`SELECT count(*), coalesce(max(time_updated), 0) FROM session_message WHERE session_id = ?`, src.Session).Scan(&n, &upd); err != nil {
+		return Summary{}, false
+	}
+	mod := time.UnixMilli(upd)
+	sm.mu.Lock()
+	e, ok := sm.cache[src.Path]
 	sm.mu.Unlock()
+	if ok && e.size == n && e.mod.Equal(mod) {
+		return e.sum, true
+	}
+
+	sm.read()
+	f := newOCFollower(src.DB, src.Session)
+	f.limit = ocSummaryRows
+	if _, err := f.Poll(); err != nil {
+		return Summary{}, false
+	}
+	msgs := f.Builder().Snapshot(ocSummaryRows)
+	s := Summary{Agent: src.Agent, Session: src.Session, Messages: len(msgs), Title: firstTitle(msgs), Last: lastMessage(msgs)}
+	if s.Title == "" && n > ocSummaryRows {
+		sm.read()
+		if head, err := newOCFollower(src.DB, src.Session).head(ocSummaryRows); err == nil {
+			s.Title = firstTitle(head)
+		}
+	}
+	sm.store(src.Path, cached{size: n, mod: mod, sum: s})
 	return s, true
 }
 
