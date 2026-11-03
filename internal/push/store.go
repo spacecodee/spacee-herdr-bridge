@@ -23,7 +23,14 @@ const MaxSubscriptions = 10
 type Store struct {
 	mu   sync.Mutex
 	path string
-	subs []webpush.Subscription // oldest first
+	subs []entry // oldest first
+}
+
+// entry is a stored subscription and the device that created it (empty for
+// subscriptions saved before devices existed).
+type entry struct {
+	webpush.Subscription
+	DeviceID string `json:"deviceId,omitempty"`
 }
 
 // OpenStore loads path, or starts empty when it does not exist. A corrupt file
@@ -53,15 +60,22 @@ func OpenStore(path string) (*Store, error) {
 func (s *Store) List() []webpush.Subscription {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return append([]webpush.Subscription(nil), s.subs...)
+	out := make([]webpush.Subscription, len(s.subs))
+	for i, e := range s.subs {
+		out[i] = e.Subscription
+	}
+	return out
 }
 
 // Upsert adds sub, replacing any with the same endpoint, and drops the oldest beyond the cap.
-func (s *Store) Upsert(sub webpush.Subscription) error {
+func (s *Store) Upsert(sub webpush.Subscription) error { return s.UpsertDevice(sub, "") }
+
+// UpsertDevice is Upsert recording the device that owns the subscription.
+func (s *Store) UpsertDevice(sub webpush.Subscription, deviceID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	next := without(s.subs, sub.Endpoint)
-	next = append(next, sub)
+	next = append(next, entry{sub, deviceID})
 	if len(next) > MaxSubscriptions {
 		next = next[len(next)-MaxSubscriptions:]
 	}
@@ -75,8 +89,27 @@ func (s *Store) Delete(endpoint string) error {
 	return s.commit(without(s.subs, endpoint))
 }
 
-func without(subs []webpush.Subscription, endpoint string) []webpush.Subscription {
-	out := make([]webpush.Subscription, 0, len(subs)+1)
+// DeleteByDevice removes every subscription saved by deviceID.
+func (s *Store) DeleteByDevice(deviceID string) error {
+	if deviceID == "" {
+		return nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	next := make([]entry, 0, len(s.subs))
+	for _, e := range s.subs {
+		if e.DeviceID != deviceID {
+			next = append(next, e)
+		}
+	}
+	if len(next) == len(s.subs) {
+		return nil
+	}
+	return s.commit(next)
+}
+
+func without(subs []entry, endpoint string) []entry {
+	out := make([]entry, 0, len(subs)+1)
 	for _, x := range subs {
 		if x.Endpoint != endpoint {
 			out = append(out, x)
@@ -86,7 +119,7 @@ func without(subs []webpush.Subscription, endpoint string) []webpush.Subscriptio
 }
 
 // commit persists next and, only on success, makes it current.
-func (s *Store) commit(next []webpush.Subscription) error {
+func (s *Store) commit(next []entry) error {
 	b, err := json.Marshal(next)
 	if err != nil {
 		return err

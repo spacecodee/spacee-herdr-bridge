@@ -99,7 +99,7 @@ func TestLogin(t *testing.T) {
 		t.Fatalf("cookies = %v", c)
 	}
 	ck := c[0]
-	if ck.Name != "spacee_session" || ck.Value != "secret" || ck.Path != "/" ||
+	if ck.Name != "spacee_session" || ck.Value == "secret" || ck.Value == "" || ck.Path != "/" ||
 		ck.MaxAge != 31536000 || !ck.HttpOnly || !ck.Secure || ck.SameSite != http.SameSiteStrictMode {
 		t.Fatalf("cookie = %+v", ck)
 	}

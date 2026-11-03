@@ -126,3 +126,27 @@ func TestHandlerTest(t *testing.T) {
 		t.Fatalf("notified: %+v", fn.got)
 	}
 }
+
+func TestSubscriptionRecordsDevice(t *testing.T) {
+	a := auth.New("tok")
+	st, err := OpenStore(filepath.Join(t.TempDir(), "push.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := Handler(a, st, "PUBKEY", &fakeNotifier{})
+	login := httptest.NewRecorder()
+	a.SessionHandler().ServeHTTP(login, httptest.NewRequest("POST", "/api/session", strings.NewReader(`{"token":"tok"}`)))
+	cookie := login.Result().Cookies()[0]
+	id, _, _ := strings.Cut(cookie.Value, ".")
+
+	r := httptest.NewRequest("POST", "/api/push/subscription", strings.NewReader(goodSub))
+	r.AddCookie(cookie)
+	if w := httptest.NewRecorder(); func() int { h.ServeHTTP(w, r); return w.Code }() != 204 {
+		t.Fatal("subscribe failed")
+	}
+	a.OnRevoke(func(id string) { st.DeleteByDevice(id) })
+	a.Revoke(id)
+	if n := len(st.List()); n != 0 {
+		t.Fatalf("subscriptions after sign out = %d, want 0", n)
+	}
+}

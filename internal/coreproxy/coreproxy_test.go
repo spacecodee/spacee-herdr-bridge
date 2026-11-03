@@ -244,3 +244,38 @@ func TestMissingCookieUnauthorized(t *testing.T) {
 		t.Fatalf("err=%v resp=%v", err, resp)
 	}
 }
+
+func TestRevokedDeviceClosesOpenWebSocket(t *testing.T) {
+	p, ch := fakeCore(t)
+	echo(ch)
+	a := auth.New("tok")
+	login := httptest.NewRecorder()
+	a.SessionHandler().ServeHTTP(login, httptest.NewRequest("POST", "/api/session", strings.NewReader(`{"token":"tok"}`)))
+	cookie := login.Result().Cookies()[0]
+	id, _, _ := strings.Cut(cookie.Value, ".")
+
+	srv := httptest.NewServer(a.Require(Handler(p)))
+	defer srv.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	c, _, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(srv.URL, "http")+"/ws",
+		&websocket.DialOptions{HTTPHeader: http.Header{"Cookie": {cookie.String()}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.CloseNow()
+	if err := c.Write(ctx, websocket.MessageBinary, []byte("ping")); err != nil {
+		t.Fatal(err)
+	}
+	if _, b, err := c.Read(ctx); err != nil || string(b) != "ping" {
+		t.Fatalf("echo: %q %v", b, err)
+	}
+
+	a.Revoke(id)
+	start := time.Now()
+	rctx, rcancel := context.WithTimeout(context.Background(), time.Second)
+	defer rcancel()
+	if _, _, err := c.Read(rctx); err == nil || rctx.Err() != nil {
+		t.Fatalf("websocket still open after revoke (err=%v, waited %v)", err, time.Since(start))
+	}
+}

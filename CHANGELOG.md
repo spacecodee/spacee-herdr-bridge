@@ -11,8 +11,15 @@ The web client served by the bridge has its own changelog in `spacee-herdr-front
 
 ### Added
 
+- Per-device sessions: each login creates a device (id, name, platform from the User-Agent) kept in `devices.json` beside the token (mode 0600, at most 20; signing in on one more signs out the least recently seen). `GET /api/devices` lists them (`current` marks the caller), `PATCH /api/devices/{id}` renames, `DELETE /api/devices/{id}` and `DELETE /api/session` sign a device out: its push subscriptions are removed and its open `/ws` and `/api/chat` streams close within a second.
+- Pairing codes: a signed-in device gets a 6-character code with `POST /api/devices/pair` (valid 5 minutes, single use, at most 5 live) and a new device logs in with `{"code": "..."}` on `POST /api/session`. Ten wrong codes in ten minutes invalidate all codes and block code logins for ten minutes (token login keeps working).
+- Push subscriptions record the device that saved them (`deviceId` in `push.json`; old entries stay valid).
 - An agent is recognized before its first message: `/api/chat` sends an empty `reset` with the agent name (instead of `none`/`not-found`) and `/api/chat/summaries` lists the terminal with `messages: 0`, so the app shows its icon and opens the chat right away (Claude Code, pi, Codex, opencode).
 - Chat transcripts show Claude Code messages typed while the agent was working: a message waiting in Claude's queue is sent with `queued: true` and removed through a new `remove` SSE event (`{"ids": [...]}`) once Claude takes it; a queued message delivered in the middle of a turn is now kept as a user message (it used to be missing from the chat). Background task notifications in the queue are not shown.
+
+### Changed
+
+- The session cookie no longer holds the access token: it is `<device id>.<device secret>` and only the secret's hash is stored. Cookies from before (equal to the token) are upgraded to a device automatically on first use, so signed-in phones stay signed in.
 
 ### Fixed
 

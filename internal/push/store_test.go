@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	webpush "github.com/SherClockHolmes/webpush-go"
@@ -113,5 +114,45 @@ func TestLoadOrCreateVAPID(t *testing.T) {
 	os.WriteFile(path, []byte("garbage"), 0o600)
 	if _, err := LoadOrCreateVAPID(path); err == nil {
 		t.Fatal("corrupt vapid file must be an error")
+	}
+}
+
+func TestStoreDeviceLink(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "push.json")
+	// an old file without deviceId stays valid
+	old := `[{"endpoint":"https://push.example/old","keys":{"p256dh":"p","auth":"a"}}]`
+	if err := os.WriteFile(path, []byte(old), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	st, err := OpenStore(path)
+	if err != nil || len(st.List()) != 1 {
+		t.Fatalf("old file: %v %v", err, st.List())
+	}
+	if err := st.UpsertDevice(sub(1), "devA"); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpsertDevice(sub(2), "devB"); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpsertDevice(sub(3), "devA"); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.DeleteByDevice("devA"); err != nil {
+		t.Fatal(err)
+	}
+	var ends []string
+	for _, s := range st.List() {
+		ends = append(ends, s.Endpoint)
+	}
+	if len(ends) != 2 || ends[0] != "https://push.example/old" || ends[1] != sub(2).Endpoint {
+		t.Fatalf("after DeleteByDevice(devA): %v", ends)
+	}
+	// persisted, with the link kept
+	raw, _ := os.ReadFile(path)
+	if !strings.Contains(string(raw), `"deviceId":"devB"`) || strings.Contains(string(raw), "devA") {
+		t.Fatalf("file: %s", raw)
+	}
+	if err := st.DeleteByDevice("nobody"); err != nil || len(st.List()) != 2 {
+		t.Fatalf("unknown device: %v", err)
 	}
 }

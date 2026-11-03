@@ -34,9 +34,11 @@ func main() {
 		log.Fatalf("token: %v", err)
 	}
 	log.Printf("token file: %s", tokenPath)
-	a := auth.New(token)
-
 	configDir := filepath.Dir(tokenPath)
+	a, err := auth.Open(token, filepath.Join(configDir, "devices.json"))
+	if err != nil {
+		log.Fatalf("devices: %v", err)
+	}
 	vapid, err := push.LoadOrCreateVAPID(filepath.Join(configDir, "vapid.json"))
 	if err != nil {
 		log.Fatalf("vapid: %v", err)
@@ -45,6 +47,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("push subscriptions: %v", err)
 	}
+	a.OnRevoke(func(id string) {
+		if err := subs.DeleteByDevice(id); err != nil {
+			log.Printf("push: could not drop subscriptions of a signed-out device: %v", err)
+		}
+	})
 	sender := &push.Sender{Store: subs, VAPID: vapid, Subject: *subject}
 	watcher := &push.Watcher{
 		Socket:  *core,
@@ -60,6 +67,8 @@ func main() {
 		w.Write([]byte("ok"))
 	})
 	mux.Handle("/api/session", a.SessionHandler())
+	mux.Handle("/api/devices", a.DevicesHandler())
+	mux.Handle("/api/devices/", a.DevicesHandler())
 	mux.Handle("GET /ws", a.Require(coreproxy.Handler(*core)))
 	mux.Handle("/api/push/", push.Handler(a, subs, vapid.Public, sender))
 	mux.Handle("/api/upload", upload.Handler(a, *uploadDir))

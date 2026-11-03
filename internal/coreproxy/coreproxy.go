@@ -64,9 +64,16 @@ func Handler(socketPath string) http.Handler {
 		log.Printf("client connected")
 		defer log.Printf("client disconnected")
 
-		ctx, cancel := context.WithCancel(context.Background())
+		// Derived from the request so that signing the device out (auth.Require
+		// cancels the request context) tears the relay down.
+		ctx, cancel := context.WithCancel(r.Context())
 		defer cancel()
 		ws := websocket.NetConn(ctx, c, websocket.MessageBinary)
+		go func() {
+			<-ctx.Done()
+			sock.Close()
+			ws.Close()
+		}()
 
 		done := make(chan struct{}, 2)
 		go func() { io.Copy(sock, ws); done <- struct{}{} }()

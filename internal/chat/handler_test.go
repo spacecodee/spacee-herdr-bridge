@@ -3,6 +3,7 @@ package chat
 import (
 	"bufio"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -360,5 +361,41 @@ func TestStreamNoneThenWaitingStillSendsReset(t *testing.T) {
 	f.fire(t, f.poll)
 	if r := s.expect(t, "reset"); r["agent"] != "pi" {
 		t.Errorf("reset = %v", r)
+	}
+}
+
+func TestRevokedDeviceClosesChatStream(t *testing.T) {
+	f := &fakes{poll: make(chan time.Time), beat: make(chan time.Time)}
+	f.set(Source{}, NoAgent)
+	a := auth.New("tok")
+	h := a.Require(Handler(a, Config{
+		Lookup:       func(string) (Terminal, error) { return Terminal{PID: 1, CWD: "/w"}, nil },
+		Resolve:      f.resolve,
+		Tick:         f.tick,
+		ResolveEvery: 1,
+		MaxStreams:   4,
+	}))
+	srv := httptest.NewServer(h)
+	t.Cleanup(srv.Close)
+
+	login := httptest.NewRecorder()
+	a.SessionHandler().ServeHTTP(login, httptest.NewRequest("POST", "/api/session", strings.NewReader(`{"token":"tok"}`)))
+	cookie := login.Result().Cookies()[0]
+	id, _, _ := strings.Cut(cookie.Value, ".")
+
+	req, _ := http.NewRequest("GET", srv.URL+"?terminal=t1", nil)
+	req.AddCookie(cookie)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil || resp.StatusCode != 200 {
+		t.Fatalf("open stream: %v %v", resp, err)
+	}
+	defer resp.Body.Close()
+	done := make(chan struct{})
+	go func() { io.Copy(io.Discard, resp.Body); close(done) }()
+	a.Revoke(id)
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("chat stream still open 1s after revoke")
 	}
 }

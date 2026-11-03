@@ -46,7 +46,7 @@ func Handler(a *auth.Auth, st *Store, publicKey string, n Notifier) http.Handler
 			http.Error(w, "invalid subscription", http.StatusBadRequest)
 			return
 		}
-		if err := st.Upsert(sub); err != nil {
+		if err := st.UpsertDevice(sub, auth.DeviceID(r.Context())); err != nil {
 			http.Error(w, "storage error", http.StatusInternalServerError)
 			return
 		}
