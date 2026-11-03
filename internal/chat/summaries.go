@@ -177,6 +177,7 @@ func (sm *Summarizer) summarize(src Source) (Summary, bool) {
 	b := NewBuilder(1 << 20)
 	t := NewTailer(src.Path, src.Parser, b)
 	t.window = summaryTail
+	t.Prefix = src.Prefix
 	if _, err := t.Poll(); err != nil {
 		return Summary{}, false
 	}

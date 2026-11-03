@@ -18,6 +18,10 @@ const (
 type Tailer struct {
 	B *Builder
 
+	// Prefix is history that comes before the file, oldest first; it is parsed on every
+	// (re)start of the read, before the file's own lines.
+	Prefix []Prefix
+
 	path     string
 	parser   Parser
 	info     os.FileInfo
@@ -25,6 +29,12 @@ type Tailer struct {
 	pending  []byte
 	skipping bool  // dropping the rest of an oversized (or cut) line
 	window   int64 // a first read starts at most this far from the end (default initialTail)
+}
+
+// Prefix is the first End bytes of another transcript, which ends on a line boundary.
+type Prefix struct {
+	Path string
+	End  int64
 }
 
 func NewTailer(path string, p Parser, b *Builder) *Tailer {
@@ -59,6 +69,7 @@ func (t *Tailer) Poll() (reset bool, err error) {
 		if size > win {
 			t.off, t.skipping = size-win, true
 		}
+		t.replay(win)
 	case size == t.off:
 		t.info = fi
 		return false, nil
@@ -77,6 +88,37 @@ func (t *Tailer) Poll() (reset bool, err error) {
 	t.off += int64(read)
 	t.consume(buf[:read])
 	return reset, nil
+}
+
+// replay parses the prefixes, each from at most win bytes before its end. A prefix that
+// cannot be read is skipped: the chat then starts at the file itself.
+func (t *Tailer) replay(win int64) {
+	for _, p := range t.Prefix {
+		f, err := os.Open(p.Path)
+		if err != nil {
+			continue
+		}
+		start := max(p.End-win, 0)
+		buf := make([]byte, p.End-start)
+		n, _ := f.ReadAt(buf, start)
+		f.Close()
+		buf = buf[:n]
+		if i := bytes.LastIndexByte(buf, '\n'); i >= 0 {
+			buf = buf[:i+1]
+		} else {
+			continue
+		}
+		if start > 0 { // the first line is cut
+			if i := bytes.IndexByte(buf, '\n'); i >= 0 {
+				buf = buf[i+1:]
+			}
+		}
+		for _, line := range bytes.Split(buf, []byte{'\n'}) {
+			if len(line) > 0 && len(line) <= maxLine {
+				t.parser.Line(line, t.B)
+			}
+		}
+	}
 }
 
 func (t *Tailer) Builder() *Builder { return t.B }

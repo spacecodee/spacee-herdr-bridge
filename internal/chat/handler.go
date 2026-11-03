@@ -116,7 +116,9 @@ func (src Source) follow() follower {
 	if src.DB != nil {
 		return newOCFollower(src.DB, src.Session)
 	}
-	return NewTailer(src.Path, src.Parser, NewBuilder(keep))
+	t := NewTailer(src.Path, src.Parser, NewBuilder(keep))
+	t.Prefix = src.Prefix
+	return t
 }
 
 // session is one open SSE connection following one terminal.

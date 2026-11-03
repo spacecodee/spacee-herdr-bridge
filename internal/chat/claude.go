@@ -101,7 +101,7 @@ func (claudeParser) Line(line []byte, b *Builder) {
 				m.Parts = []Part{textPart("text", text)}
 			}
 			b.Enqueue(text, m)
-		case "dequeue", "remove":
+		case "dequeue", "remove", "popAll": // popAll: Up pulled the message back into the composer
 			b.Dequeue(text)
 		}
 	case "attachment":

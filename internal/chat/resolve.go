@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -27,7 +28,8 @@ type Source struct {
 	Session string
 	Path    string
 	Parser  Parser
-	DB      *sql.DB // opencode: the session lives in this database, not in Path/Parser
+	Prefix  []Prefix // history before Path (a Codex rewind forks into a new file)
+	DB      *sql.DB  // opencode: the session lives in this database, not in Path/Parser
 }
 
 // Why nothing is shown (the reason of an SSE "none" event).
@@ -344,7 +346,7 @@ func (r Resolver) codex(p proc, cwd string) (Source, bool) {
 	sort.Slice(files, func(i, j int) bool { return modTime(files[i]).After(modTime(files[j])) })
 	for _, f := range files {
 		if path, ok := newestAfter(root, []string{f}, p.start); ok && codexCWD(path) == cwd {
-			return Source{Agent: "codex", Session: strings.TrimSuffix(filepath.Base(path), ".jsonl"), Path: path, Parser: codexParser{}}, true
+			return Source{Agent: "codex", Session: strings.TrimSuffix(filepath.Base(path), ".jsonl"), Path: path, Parser: codexParser{}, Prefix: codexPrefix(root, path)}, true
 		}
 	}
 	return Source{Agent: "codex"}, false
@@ -358,26 +360,114 @@ func modTime(p string) time.Time {
 	return fi.ModTime()
 }
 
-// codexCWD reads the cwd from the session_meta on the first line (which carries the long
-// base instructions, hence the large buffer).
+// codexCWD reads the cwd from the session_meta on the first line.
 func codexCWD(path string) string {
+	m, _ := readCodexMeta(path)
+	return m.CWD
+}
+
+// codexMeta is the part of a rollout's session_meta (first line) that matters here.
+type codexMeta struct {
+	ID          string `json:"id"`
+	CWD         string `json:"cwd"`
+	HistoryBase *struct {
+		ThreadID string `json:"thread_id"`
+		Ordinal  int    `json:"end_ordinal_exclusive"`
+		Offset   int64  `json:"end_byte_offset"`
+	} `json:"history_base"`
+}
+
+// readCodexMeta reads the first line (which carries the long base instructions, hence the
+// large buffer).
+func readCodexMeta(path string) (codexMeta, bool) {
 	f, err := os.Open(path)
 	if err != nil {
-		return ""
+		return codexMeta{}, false
 	}
 	defer f.Close()
 	line, err := bufio.NewReaderSize(f, 1<<20).ReadBytes('\n')
 	if err != nil && len(line) == 0 {
-		return ""
+		return codexMeta{}, false
 	}
 	var m struct {
-		Type    string `json:"type"`
-		Payload struct {
-			CWD string `json:"cwd"`
-		} `json:"payload"`
+		Type    string    `json:"type"`
+		Payload codexMeta `json:"payload"`
 	}
 	if json.Unmarshal(line, &m) != nil || m.Type != "session_meta" {
-		return ""
+		return codexMeta{}, false
 	}
-	return m.Payload.CWD
+	return m.Payload, true
+}
+
+const maxForkDepth = 8
+
+// codexPrefix follows history_base links: a rewind makes Codex start a new rollout whose
+// history is the first end_ordinal_exclusive lines of an older rollout of the same thread
+// plus the new file. The result lists those prefixes oldest first. A missing, foreign
+// (outside root) or disagreeing parent ends the chain: the chat then starts where it can.
+//
+// The parent is the newest older rollout of the thread where the ordinal and the byte
+// offset agree (the offset ends a line and exactly ordinal lines come before it). The
+// offset is what the Tailer seeks with; the ordinal only validates it.
+func codexPrefix(root, path string) []Prefix {
+	var chain []Prefix
+	for range maxForkDepth {
+		m, ok := readCodexMeta(path)
+		if !ok || m.HistoryBase == nil || m.HistoryBase.ThreadID == "" {
+			break
+		}
+		hb := m.HistoryBase
+		parent, ok := codexParent(root, path, hb.ThreadID, hb.Ordinal, hb.Offset)
+		if !ok {
+			break
+		}
+		chain = append([]Prefix{{Path: parent, End: hb.Offset}}, chain...)
+		path = parent
+	}
+	return chain
+}
+
+func codexParent(root, child, thread string, ordinal int, offset int64) (string, bool) {
+	if !sessionID.MatchString(thread) || ordinal <= 0 || offset <= 0 {
+		return "", false
+	}
+	cands, _ := filepath.Glob(filepath.Join(root, "sessions", "*", "*", "*", "rollout-*"+thread+"*.jsonl"))
+	// rollout-<timestamp>-<thread>[_<turn>].jsonl: the timestamp sorts as text
+	stamp := func(p string) string { return strings.TrimPrefix(filepath.Base(p), "rollout-") }
+	sort.Slice(cands, func(i, j int) bool { return stamp(cands[i]) > stamp(cands[j]) })
+	for _, c := range cands {
+		rp, ok := inside(root, c)
+		if !ok || stamp(c) >= stamp(child) {
+			continue
+		}
+		if m, ok := readCodexMeta(rp); ok && m.ID == thread && endsAfterLines(rp, offset, ordinal) {
+			return rp, true
+		}
+	}
+	return "", false
+}
+
+// endsAfterLines reports whether the first offset bytes of the file are exactly n lines.
+func endsAfterLines(path string, offset int64, n int) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	buf := make([]byte, 64<<10)
+	var read int64
+	lines := 0
+	for read < offset {
+		want := min(int64(len(buf)), offset-read)
+		got, err := io.ReadFull(f, buf[:want])
+		lines += bytes.Count(buf[:got], []byte{'\n'})
+		read += int64(got)
+		if err != nil {
+			break
+		}
+		if read == offset && buf[got-1] != '\n' {
+			return false
+		}
+	}
+	return read == offset && lines == n
 }
