@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -161,9 +162,10 @@ type ocBlock struct {
 	ID    string `json:"id"`
 	Name  string `json:"name"`
 	State struct {
-		Status  string          `json:"status"`
-		Input   json.RawMessage `json:"input"`
-		Content []struct {
+		Status   string          `json:"status"`
+		Input    json.RawMessage `json:"input"`
+		Metadata json.RawMessage `json:"metadata"`
+		Content  []struct {
 			Type string `json:"type"`
 			Text string `json:"text"`
 		} `json:"content"`
@@ -220,7 +222,7 @@ func ocMessage(r ocRow) (Message, bool) {
 }
 
 func ocTool(bl ocBlock) Part {
-	p := toolPart(bl.ID, bl.Name, string(bl.State.Input))
+	p := newToolPart(bl.ID, bl.Name, string(bl.State.Input))
 	var out string
 	switch bl.State.Status {
 	case "completed":
@@ -242,5 +244,30 @@ func ocTool(bl ocBlock) Part {
 	var cut bool
 	p.Output, cut = clip(out, maxIO)
 	p.Truncated = p.Truncated || cut
+	if p.Status == "ok" && len(p.Questions) > 0 {
+		p.setAnswers(ocAnswers(p.Questions, bl.State.Metadata, out))
+	}
 	return p
+}
+
+// ocAnswers reads the answers of a question call: {"answers": [[label, ...], ...]}, one
+// array per question by index, in the state metadata or (older rows) as the output text.
+// An empty array is an unanswered question.
+func ocAnswers(qs []Question, metadata json.RawMessage, output string) map[string]string {
+	var d struct {
+		Answers [][]string `json:"answers"`
+	}
+	if json.Unmarshal(metadata, &d) != nil || len(d.Answers) == 0 {
+		d.Answers = nil
+		if json.Unmarshal([]byte(output), &d) != nil {
+			return nil
+		}
+	}
+	out := map[string]string{}
+	for i, a := range d.Answers {
+		if i < len(qs) && len(a) > 0 {
+			out[qs[i].Question] = strings.Join(a, ", ")
+		}
+	}
+	return out
 }

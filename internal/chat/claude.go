@@ -56,7 +56,8 @@ func (claudeParser) Line(line []byte, b *Builder) {
 			Prompt      string `json:"prompt"`
 			CommandMode string `json:"commandMode"`
 		} `json:"attachment"`
-		Message struct {
+		ToolUseResult json.RawMessage `json:"toolUseResult"`
+		Message       struct {
 			ID      string          `json:"id"`
 			Content json.RawMessage `json:"content"`
 		} `json:"message"`
@@ -127,9 +128,15 @@ func (claudeParser) Line(line []byte, b *Builder) {
 						parts = append(parts, textPart("thinking", bl.Thinking))
 					}
 				case "tool_use":
-					parts = append(parts, toolPart(bl.ID, bl.Name, string(bl.Input)))
+					parts = append(parts, newToolPart(bl.ID, bl.Name, string(bl.Input)))
 				case "tool_result":
 					b.Result(bl.ToolUseID, contentText(bl.Content), bl.IsError)
+					var tur struct {
+						Answers map[string]string `json:"answers"`
+					}
+					if json.Unmarshal(r.ToolUseResult, &tur) == nil {
+						b.Answers(bl.ToolUseID, tur.Answers)
+					}
 				case "image":
 					parts = append(parts, imagePart())
 				}

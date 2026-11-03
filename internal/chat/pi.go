@@ -1,6 +1,9 @@
 package chat
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"strings"
+)
 
 // piParser reads pi transcripts (~/.pi/agent/sessions/--<cwd>--/*.jsonl).
 type piParser struct{}
@@ -16,6 +19,7 @@ func (piParser) Line(line []byte, b *Builder) {
 			ToolCallID   string          `json:"toolCallId"`
 			IsError      bool            `json:"isError"`
 			ErrorMessage string          `json:"errorMessage"`
+			Details      json.RawMessage `json:"details"`
 		} `json:"message"`
 	}
 	if json.Unmarshal(line, &r) != nil || r.Type != "message" {
@@ -24,7 +28,11 @@ func (piParser) Line(line []byte, b *Builder) {
 	m := r.Message
 	switch m.Role {
 	case "toolResult":
+		asking := b.Asking(m.ToolCallID)
 		b.Result(m.ToolCallID, contentText(m.Content), m.IsError)
+		if asking {
+			b.Answers(m.ToolCallID, piAnswers(m.Details))
+		}
 	case "user", "assistant":
 		var parts []Part
 		var s string
@@ -55,7 +63,7 @@ func (piParser) Line(line []byte, b *Builder) {
 						parts = append(parts, textPart("thinking", bl.Thinking))
 					}
 				case "toolCall":
-					parts = append(parts, toolPart(bl.ID, bl.Name, string(bl.Arguments)))
+					parts = append(parts, newToolPart(bl.ID, bl.Name, string(bl.Arguments)))
 				case "image":
 					parts = append(parts, imagePart())
 				}
@@ -67,4 +75,36 @@ func (piParser) Line(line []byte, b *Builder) {
 		}
 		b.Add(Message{ID: r.ID, Role: m.Role, Time: r.Timestamp, Parts: parts})
 	}
+}
+
+// piAnswers reads the details of an ask_user_question result (answers: free text or the
+// selected labels, per question) or an ask_user_choice result (the selected option).
+func piAnswers(raw json.RawMessage) map[string]string {
+	var d struct {
+		Question  string `json:"question"`
+		Selection *struct {
+			Label string `json:"label"`
+		} `json:"selection"`
+		Answers []struct {
+			Question string   `json:"question"`
+			Answer   *string  `json:"answer"`
+			Selected []string `json:"selected"`
+		} `json:"answers"`
+	}
+	if json.Unmarshal(raw, &d) != nil {
+		return nil
+	}
+	out := map[string]string{}
+	if d.Selection != nil && d.Question != "" {
+		out[d.Question] = d.Selection.Label
+	}
+	for _, a := range d.Answers {
+		switch {
+		case a.Answer != nil && *a.Answer != "":
+			out[a.Question] = *a.Answer
+		case len(a.Selected) > 0:
+			out[a.Question] = strings.Join(a.Selected, ", ")
+		}
+	}
+	return out
 }

@@ -77,12 +77,28 @@ func (codexParser) Line(line []byte, b *Builder) {
 			msg("assistant", textPart("thinking", strings.Join(texts, "\n\n")))
 		}
 	case "function_call":
-		msg("assistant", toolPart(p.CallID, p.Name, p.Arguments))
+		msg("assistant", newToolPart(p.CallID, p.Name, p.Arguments))
 	case "custom_tool_call":
 		msg("assistant", toolPart(p.CallID, p.Name, p.Input))
 	case "function_call_output", "custom_tool_call_output":
 		out, failed := codexOutput(p.Output)
+		asking := b.Asking(p.CallID)
 		b.Result(p.CallID, out, failed)
+		if asking {
+			// {"answers":{"<question id>":{"answers":["<label>", ...]}}}
+			var res struct {
+				Answers map[string]struct {
+					Answers []string `json:"answers"`
+				} `json:"answers"`
+			}
+			if json.Unmarshal([]byte(out), &res) == nil {
+				got := map[string]string{}
+				for id, a := range res.Answers {
+					got[id] = strings.Join(a.Answers, ", ")
+				}
+				b.Answers(p.CallID, got)
+			}
+		}
 	}
 }
 

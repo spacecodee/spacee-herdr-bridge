@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"unicode/utf8"
 )
@@ -14,6 +15,10 @@ const (
 	maxText = 64 << 10 // per text part
 	maxIO   = 8 << 10  // per tool input/output
 	maxSumm = 80       // tool summary, in bytes
+
+	maxQuestions = 4   // questions per ask
+	maxOptions   = 6   // options per question
+	maxQText     = 512 // each question, header, label, description and answer
 )
 
 // Part is one piece of a message: text, thinking, a tool call (with its result) or an image.
@@ -29,6 +34,27 @@ type Part struct {
 	Path      string `json:"path,omitempty"`   // image
 	Note      string `json:"note,omitempty"`   // image
 	Truncated bool   `json:"truncated,omitempty"`
+	// Questions is an agent asking the user to choose (Claude Code's AskUserQuestion); the
+	// tool is running while it waits. Answers maps question text to the chosen answer.
+	Questions []Question        `json:"questions,omitempty"`
+	Answers   map[string]string `json:"answers,omitempty"`
+}
+
+// Question is one multiple-choice question an agent asks.
+type Question struct {
+	Question    string   `json:"question"`
+	Header      string   `json:"header,omitempty"`
+	MultiSelect bool     `json:"multiSelect,omitempty"`
+	Other       bool     `json:"other,omitempty"`  // a free-text answer is allowed
+	Secret      bool     `json:"secret,omitempty"` // the answer is never sent to the client
+	Options     []Option `json:"options"`          // empty for a free-text question
+	id          string   // the agent's own question id (Codex), to match answers
+}
+
+// Option is one choice of a Question.
+type Option struct {
+	Label       string `json:"label"`
+	Description string `json:"description,omitempty"`
 }
 
 // Message is a normalized chat message. Its ID is stable across updates.
@@ -83,6 +109,83 @@ func toolPart(id, name string, input string) Part {
 	p.Input, cut = clip(input, maxIO)
 	p.Truncated = cut
 	return p
+}
+
+// questionTools are the agents' structured multiple-choice tools: Claude Code
+// AskUserQuestion, pi ask_user_question / ask_user_choice (extensions), Codex
+// request_user_input (Plan mode).
+var questionTools = map[string]bool{
+	"AskUserQuestion": true, "ask_user_question": true, "ask_user_choice": true,
+	"request_user_input": true, "question": true,
+}
+
+// newToolPart builds a running tool part; a question tool with usable input also gets
+// Questions. Input that is not a usable question list yields the generic tool part.
+func newToolPart(id, name, input string) Part {
+	p := toolPart(id, name, input)
+	if !questionTools[name] {
+		return p
+	}
+	type opt struct {
+		Label       string `json:"label"`
+		Description string `json:"description"`
+	}
+	type ask struct {
+		ID          string `json:"id"`
+		Question    string `json:"question"`
+		Header      string `json:"header"`
+		MultiSelect bool   `json:"multiSelect"`
+		Multiple    bool   `json:"multiple"` // opencode
+		IsOther     bool   `json:"isOther"`  // Codex
+		IsSecret    bool   `json:"isSecret"` // Codex
+		Options     []opt  `json:"options"`
+	}
+	var in struct {
+		ask
+		Questions []ask `json:"questions"`
+	}
+	if json.Unmarshal([]byte(input), &in) != nil {
+		return p
+	}
+	qs := in.Questions
+	if len(qs) == 0 { // ask_user_choice carries a single question at the top level
+		qs = []ask{in.ask}
+	}
+	for _, q := range qs {
+		if len(p.Questions) == maxQuestions {
+			p.Truncated = true
+			break
+		}
+		if strings.TrimSpace(q.Question) == "" {
+			continue
+		}
+		out := Question{id: q.ID, MultiSelect: q.MultiSelect || q.Multiple, Secret: q.IsSecret, Options: []Option{}}
+		switch name {
+		case "ask_user_choice": // options only
+		case "request_user_input":
+			out.Other = q.IsOther || len(q.Options) == 0
+		default: // Claude, pi ask_user_question and opencode always take a typed answer
+			out.Other = true
+		}
+		out.Question = p.clipQ(q.Question)
+		out.Header = p.clipQ(q.Header)
+		for _, o := range q.Options {
+			if len(out.Options) == maxOptions {
+				p.Truncated = true
+				break
+			}
+			out.Options = append(out.Options, Option{Label: p.clipQ(o.Label), Description: p.clipQ(o.Description)})
+		}
+		p.Questions = append(p.Questions, out)
+	}
+	return p
+}
+
+// clipQ clips s to maxQText and marks the part truncated when it cut something.
+func (p *Part) clipQ(s string) string {
+	s, cut := clip(s, maxQText)
+	p.Truncated = p.Truncated || cut
+	return s
 }
 
 // summaryKeys picks, per tool name, which argument is the one-line summary.
@@ -319,11 +422,65 @@ func (b *Builder) Result(callID, output string, isErr bool) {
 	var cut bool
 	p.Output, cut = clip(output, maxIO)
 	p.Truncated = p.Truncated || cut
+	for _, q := range p.Questions {
+		if q.Secret { // the raw output holds the secret answer
+			p.Output = ""
+		}
+	}
 	p.Status = "ok"
 	if isErr {
 		p.Status = "error"
 	}
 	b.dirty[ref.msg.ID] = true
+}
+
+// Asking reports whether callID is a pending question call.
+func (b *Builder) Asking(callID string) bool {
+	ref, ok := b.tools[callID]
+	return ok && len(ref.msg.Parts[ref.idx].Questions) > 0
+}
+
+// Answers records the answers of a question call, keyed by question text (or by the
+// agent's question id). Unknown call ids and calls without questions are ignored.
+func (b *Builder) Answers(callID string, answers map[string]string) {
+	ref, ok := b.tools[callID]
+	if !ok {
+		return
+	}
+	if ref.msg.Parts[ref.idx].setAnswers(answers) {
+		b.dirty[ref.msg.ID] = true
+	}
+}
+
+// setAnswers stores the answers of a question part (at most maxQuestions, clipped). The
+// answer to a secret question is masked. It reports whether anything was stored.
+func (p *Part) setAnswers(answers map[string]string) bool {
+	if len(p.Questions) == 0 || len(answers) == 0 {
+		return false
+	}
+	keys := make([]string, 0, len(answers))
+	for k := range answers {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	p.Answers = map[string]string{}
+	for _, k := range keys {
+		if len(p.Answers) == maxQuestions {
+			p.Truncated = true
+			break
+		}
+		name, answer := k, answers[k]
+		for _, q := range p.Questions {
+			if q.id != "" && q.id == k {
+				name = q.Question
+			}
+			if (q.id == k || q.Question == k) && q.Secret {
+				answer = "••••"
+			}
+		}
+		p.Answers[p.clipQ(name)] = p.clipQ(answer)
+	}
+	return true
 }
 
 // Snapshot returns copies of the last n messages.
@@ -361,5 +518,14 @@ func (b *Builder) Drain() (added, updated []Message) {
 func copyMsg(m *Message) Message {
 	c := *m
 	c.Parts = append([]Part(nil), m.Parts...)
+	for i, p := range c.Parts {
+		if p.Answers != nil { // later results mutate the map in place; give the copy its own
+			a := make(map[string]string, len(p.Answers))
+			for k, v := range p.Answers {
+				a[k] = v
+			}
+			c.Parts[i].Answers = a
+		}
+	}
 	return c
 }

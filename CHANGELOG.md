@@ -9,6 +9,10 @@ The web client served by the bridge has its own changelog in `spacee-herdr-front
 
 ## [Unreleased]
 
+### Added
+
+- The chat stream marks agent questions for Claude Code (`AskUserQuestion`), pi (the `ask_user_question` and `ask_user_choice` tools) and Codex (`request_user_input`, Plan mode) and opencode (`question`): the tool part carries `questions` (question, header, `multiSelect`, `other` when a typed answer is allowed, `secret` for Codex secret questions whose answer is masked, options (empty for a free-text question) with label and description; at most 4 questions and 6 options, text clipped) and stays `running` while pending; once answered it becomes `ok` and carries `answers` (question text to chosen answer, multiple choices joined with ", "). A reconnect `reset` shows unanswered questions as pending.
+
 ## [1.1.0] - 2026-11-03
 
 ### Added
