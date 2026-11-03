@@ -7,6 +7,12 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FRONTEND_DIR="${FRONTEND_DIR:-$ROOT/../spacee-herdr-frontend}"
 IMAGE="ghcr.io/spacecodee/spacee-herdr-bridge"
+# GHCR links a multi-arch package to its repo from the index annotations, not the per-platform labels.
+INDEX_ANNOTATIONS=(
+  --annotation "index:org.opencontainers.image.source=https://github.com/spacecodee/spacee-herdr-bridge"
+  --annotation "index:org.opencontainers.image.description=Bridge between the spacee-herdr web client and herdr-core"
+  --annotation "index:org.opencontainers.image.licenses=MIT"
+)
 DRY=0
 PUSH_IMAGE=0
 VERSION=""
@@ -35,7 +41,7 @@ if [ "$PUSH_IMAGE" -eq 1 ]; then
   if [ "$DRY" -eq 1 ]; then
     step "docker buildx create --name $BUILDER --driver docker-container   (only if missing)"
     step "git worktree add <tmp dir> $TAG   (removed on exit)"
-    step "docker buildx build --builder $BUILDER --platform linux/amd64,linux/arm64 --build-arg VERSION=$VERSION --push -t $IMAGE:$VERSION -t $IMAGE:latest <tmp dir>"
+    step "docker buildx build --builder $BUILDER --platform linux/amd64,linux/arm64 --build-arg VERSION=$VERSION --annotation index:org.opencontainers.image.{source,description,licenses}=... --push -t $IMAGE:$VERSION -t $IMAGE:latest <tmp dir>"
     step "docker logout ghcr.io   (always, on success or failure)"
     exit 0
   fi
@@ -56,7 +62,7 @@ if [ "$PUSH_IMAGE" -eq 1 ]; then
   WORK="$(mktemp -d)"
   git -C "$ROOT" worktree add --detach "$WORK/src" "$TAG" >/dev/null
   docker buildx build --builder "$BUILDER" --platform linux/amd64,linux/arm64 \
-    --build-arg "VERSION=$VERSION" --push -t "$IMAGE:$VERSION" -t "$IMAGE:latest" "$WORK/src" \
+    --build-arg "VERSION=$VERSION" "${INDEX_ANNOTATIONS[@]}" --push -t "$IMAGE:$VERSION" -t "$IMAGE:latest" "$WORK/src" \
     || die "build or push failed (is the token valid, with write:packages?)"
   echo "==> pushed $IMAGE:$VERSION and :latest"
   exit 0
