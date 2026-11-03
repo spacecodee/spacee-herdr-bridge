@@ -9,6 +9,15 @@ The web client served by the bridge has its own changelog in `spacee-herdr-front
 
 ## [Unreleased]
 
+### Added
+
+- `scripts/deploy.sh`: builds the image from the checkout with the git version and restarts it, then checks `/healthz`.
+
+### Fixed
+
+- Images built locally with `docker compose` report their version instead of `dev` (`BRIDGE_BUILD_VERSION`).
+- `scripts/build.sh` tags the image `ghcr.io/spacecodee/spacee-herdr-bridge`, and `release.sh` builds with the release version instead of a `-dirty` git describe.
+
 ## [1.2.1] - 2026-11-03
 
 ### Added

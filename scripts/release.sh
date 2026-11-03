@@ -92,13 +92,13 @@ update_changelog() { # <repo-dir> <github-repo>
 echo "==> releasing $TAG (bridge + frontend), date $TODAY"
 step "update both CHANGELOG.md files (move [Unreleased] to [$VERSION] - $TODAY, compare links)"
 step "set frontend package.json version to $VERSION"
-step "scripts/build.sh"
+step "VERSION=$TAG scripts/build.sh"
 step "commit 'chore(release): $VERSION' and tag $TAG in both repos"
 if [ "$DRY" -eq 0 ]; then
   update_changelog "$ROOT" spacee-herdr-bridge
   update_changelog "$FRONTEND_DIR" spacee-herdr-frontend
   (cd "$FRONTEND_DIR" && npm pkg set "version=$VERSION" >/dev/null)
-  "$ROOT/scripts/build.sh"
+  VERSION="$TAG" "$ROOT/scripts/build.sh"
   for repo in "$FRONTEND_DIR" "$ROOT"; do
     git -C "$repo" add -A
     git -C "$repo" commit -q -m "chore(release): $VERSION"

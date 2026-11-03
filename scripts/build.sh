@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Full local build: frontend, embed, bridge checks, release binaries and the Docker image.
-# Usage: scripts/build.sh [--skip-tests]
+# Usage: [VERSION=v1.3.0] scripts/build.sh [--skip-tests]
+# VERSION defaults to `git describe`; release.sh sets it so the build carries the release version.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -15,7 +16,8 @@ done
 
 [ -d "$FRONTEND_DIR" ] || { echo "frontend not found at $FRONTEND_DIR (set FRONTEND_DIR)" >&2; exit 1; }
 FRONTEND_DIR="$(cd "$FRONTEND_DIR" && pwd)"
-VERSION="$(git -C "$ROOT" describe --tags --always --dirty)"
+VERSION="${VERSION:-$(git -C "$ROOT" describe --tags --always --dirty)}"
+IMAGE="ghcr.io/spacecodee/spacee-herdr-bridge"
 echo "==> building $VERSION"
 
 echo "==> frontend"
@@ -51,5 +53,5 @@ ls -lh "$OUT"
 
 echo "==> docker image"
 docker build --build-arg "VERSION=$VERSION" \
-  -t "spacee-herdr-bridge:$VERSION" -t spacee-herdr-bridge:latest "$ROOT"
+  -t "$IMAGE:$VERSION" -t "$IMAGE:latest" "$ROOT"
 echo "==> done: $VERSION"

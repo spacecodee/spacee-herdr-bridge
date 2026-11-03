@@ -201,7 +201,7 @@ The frontend is embedded at build time. After a frontend change:
 ```sh
 (cd ../spacee-herdr-frontend && pnpm build)
 rm -rf internal/webui/dist/* && cp -R ../spacee-herdr-frontend/dist/spacee-herdr-frontend/browser/. internal/webui/dist/
-docker compose up -d --build
+scripts/deploy.sh   # docker compose up -d --build with the git version, then checks /healthz
 ```
 
 ## 6. Publish to the tailnet with `tailscale serve`
@@ -255,7 +255,7 @@ step 3 before using the bridge.
 
 ## Maintenance
 
-- **Update**: `git pull && docker compose pull && docker compose up -d` (or `git pull && docker compose up -d --build` to build locally). Pin a release with `BRIDGE_VERSION=1.2.0`.
+- **Update**: `git pull && docker compose pull && docker compose up -d` (or `git pull && scripts/deploy.sh` to build locally with the git version). Pin a release with `BRIDGE_VERSION=1.2.0`.
 - **Publishing the image** (maintainers): see "Publishing the image" in the README. The token needs only `write:packages`, logout is automatic, and `~/.docker` must never be mounted into the container. After the first push, make the package public once in GitHub (Package settings → Change visibility).
 - **Logs**: `docker compose logs -f`. The bridge never logs tokens or terminal data.
 - **Sign out a device** (lost phone): in the app, Settings → Devices, open the device and

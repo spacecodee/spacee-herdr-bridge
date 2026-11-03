@@ -158,7 +158,7 @@ To ship a new web app build, build the frontend and copy it into the embedded di
 ```sh
 (cd ../spacee-herdr-frontend && pnpm build)
 rm -rf internal/webui/dist/* && cp -R ../spacee-herdr-frontend/dist/spacee-herdr-frontend/browser/. internal/webui/dist/
-docker compose up -d --build
+scripts/deploy.sh   # docker compose up -d --build with the git version, then checks /healthz
 ```
 
 ## Build and release
