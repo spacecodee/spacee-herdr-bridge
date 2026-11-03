@@ -1,1 +1,0 @@
-import{It as Wi}from"./chunk-CTNYVGpZ.js";import{ht as yo}from"./chunk-Cw3VgwOu.js";var t=class e{constructor(){yo(()=>`bg-muted rounded-2xl block motion-safe:animate-pulse`)}static ɵfac=function(s){return new(s||e)};static ɵdir=Wi({type:e,selectors:[[``,`hlmSkeleton`,``],[`hlm-skeleton`]],hostAttrs:[`data-slot`,`skeleton`],exportAs:[`hlmSkeleton`]})};export{t};
