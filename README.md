@@ -2,9 +2,9 @@
 
 **Use your herdr-core terminals and coding agents from your phone.**
 
-[![License: MIT](https://img.shields.io/github/license/spacecodee/spacee-herdr-bridge)](LICENSE)
-[![Latest release](https://img.shields.io/github/v/release/spacecodee/spacee-herdr-bridge)](https://github.com/spacecodee/spacee-herdr-bridge/releases)
-[![Go version](https://img.shields.io/github/go-mod/go-version/spacecodee/spacee-herdr-bridge)](https://go.dev)
+[![License: MIT](https://img.shields.io/github/license/spacecodee/spacee-herdr-bridge?cacheSeconds=3600)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/spacecodee/spacee-herdr-bridge?cacheSeconds=3600)](https://github.com/spacecodee/spacee-herdr-bridge/releases)
+[![Go version](https://img.shields.io/github/go-mod/go-version/spacecodee/spacee-herdr-bridge?cacheSeconds=3600)](https://go.dev)
 
 <p align="center">
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/home-dark.png"><img src="docs/screenshots/home-light.png" alt="Home" width="200"></picture> <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/chat-dark.png"><img src="docs/screenshots/chat-light.png" alt="Chat" width="200"></picture> <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/question-dark.png"><img src="docs/screenshots/question-light.png" alt="Agent question" width="200"></picture> <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/terminal-dark.png"><img src="docs/screenshots/terminal-light.png" alt="Terminal" width="200"></picture>
