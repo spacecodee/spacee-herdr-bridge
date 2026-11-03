@@ -23,7 +23,8 @@ type Tailer struct {
 	info     os.FileInfo
 	off      int64
 	pending  []byte
-	skipping bool // dropping the rest of an oversized (or cut) line
+	skipping bool  // dropping the rest of an oversized (or cut) line
+	window   int64 // a first read starts at most this far from the end (default initialTail)
 }
 
 func NewTailer(path string, p Parser, b *Builder) *Tailer {
@@ -51,8 +52,12 @@ func (t *Tailer) Poll() (reset bool, err error) {
 		reset = true
 		t.B.Reset()
 		t.pending, t.skipping, t.off = nil, false, 0
-		if size > initialTail {
-			t.off, t.skipping = size-initialTail, true
+		win := t.window
+		if win <= 0 {
+			win = initialTail
+		}
+		if size > win {
+			t.off, t.skipping = size-win, true
 		}
 	case size == t.off:
 		t.info = fi

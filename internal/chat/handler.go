@@ -28,7 +28,8 @@ var addressRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9][A-Z
 // Config wires the chat endpoint. Zero values get production defaults; the function
 // fields exist so tests can run without a core, a /proc or real timers.
 type Config struct {
-	Socket       string // herdr-core Unix socket (terminal.get)
+	Socket       string                   // herdr-core Unix socket (terminal.get, terminal.list)
+	List         func() ([]string, error) // live local terminal addresses (summaries)
 	Resolver     Resolver
 	Lookup       func(address string) (Terminal, error)
 	Resolve      func(Terminal) (Source, string)
@@ -217,45 +218,88 @@ func (s *session) raw(text string) {
 	}
 }
 
-// lookupTerminal asks core (terminal.get) for the foreground process and directory.
-func lookupTerminal(socket, address string) (Terminal, error) {
+// call sends one JSON-RPC request to core and returns its result.
+func call(socket, method string, params any) (json.RawMessage, error) {
 	c, err := net.DialTimeout("unix", socket, lookupTimeout)
 	if err != nil {
-		return Terminal{}, err
+		return nil, err
 	}
 	defer c.Close()
 	c.SetDeadline(time.Now().Add(lookupTimeout))
-	req, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "method": "terminal.get", "params": map[string]string{"terminal": address}})
+	req, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "method": method, "params": params})
 	if _, err := c.Write(append(req, '\n')); err != nil {
-		return Terminal{}, err
+		return nil, err
 	}
 	line, err := bufio.NewReaderSize(c, 1<<20).ReadBytes('\n')
 	if err != nil {
-		return Terminal{}, err
+		return nil, err
 	}
 	var resp struct {
-		Result *struct {
-			PID        int    `json:"pid"`
-			CWD        string `json:"cwd"`
-			Foreground *struct {
-				PID int    `json:"pid"`
-				CWD string `json:"cwd"`
-			} `json:"foreground"`
-		} `json:"result"`
-		Error json.RawMessage `json:"error"`
+		Result json.RawMessage `json:"result"`
+		Error  json.RawMessage `json:"error"`
 	}
 	if err := json.Unmarshal(line, &resp); err != nil {
+		return nil, err
+	}
+	if len(resp.Result) == 0 || string(resp.Result) == "null" {
+		return nil, fmt.Errorf("%s: no result", method)
+	}
+	return resp.Result, nil
+}
+
+// lookupTerminal asks core (terminal.get) for the foreground process and directory.
+func lookupTerminal(socket, address string) (Terminal, error) {
+	raw, err := call(socket, "terminal.get", map[string]string{"terminal": address})
+	if err != nil {
 		return Terminal{}, err
 	}
-	if resp.Result == nil {
-		return Terminal{}, fmt.Errorf("terminal.get: no result")
+	var r struct {
+		PID        int    `json:"pid"`
+		CWD        string `json:"cwd"`
+		Foreground *struct {
+			PID int    `json:"pid"`
+			CWD string `json:"cwd"`
+		} `json:"foreground"`
 	}
-	t := Terminal{PID: resp.Result.PID, CWD: resp.Result.CWD}
-	if fg := resp.Result.Foreground; fg != nil && fg.PID > 0 {
+	if err := json.Unmarshal(raw, &r); err != nil {
+		return Terminal{}, err
+	}
+	t := Terminal{PID: r.PID, CWD: r.CWD}
+	if fg := r.Foreground; fg != nil && fg.PID > 0 {
 		t.PID = fg.PID
 		if fg.CWD != "" {
 			t.CWD = fg.CWD
 		}
 	}
 	return t, nil
+}
+
+// listLive asks core (terminal.list) for the live terminals that run on this machine.
+func listLive(socket string) ([]string, error) {
+	raw, err := call(socket, "terminal.list", map[string]any{})
+	if err != nil {
+		return nil, err
+	}
+	return liveLocal(raw), nil
+}
+
+// liveLocal picks the addresses of live terminals of this machine (remote ones carry a
+// "machine/" prefix) out of a terminal.list result.
+func liveLocal(raw []byte) []string {
+	var r struct {
+		Terminals []struct {
+			Address string `json:"address"`
+			State   string `json:"state"`
+		} `json:"terminals"`
+	}
+	if json.Unmarshal(raw, &r) != nil {
+		return nil
+	}
+	var out []string
+	for _, t := range r.Terminals {
+		if t.State == "live" && addressRe.MatchString(t.Address) && !strings.Contains(t.Address, "/") {
+			out = append(out, t.Address)
+		}
+	}
+	return out
 }

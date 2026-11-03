@@ -41,6 +41,15 @@ type Resolver struct {
 	Proc string // /proc
 	Home string
 	Now  func() time.Time
+
+	procs map[int]proc // set by Snapshot
+}
+
+// Snapshot returns a Resolver that reuses one scan of the process table, for resolving
+// many terminals in one request.
+func (r Resolver) Snapshot() Resolver {
+	r.procs = r.processes()
+	return r
 }
 
 const clockTicks = 100 // USER_HZ on Linux
@@ -100,6 +109,9 @@ func (r Resolver) Resolve(t Terminal) (Source, string) {
 
 // processes reads {pid, ppid, start, argv} for every process under r.Proc.
 func (r Resolver) processes() map[int]proc {
+	if r.procs != nil {
+		return r.procs
+	}
 	boot := r.bootTime()
 	entries, _ := os.ReadDir(r.Proc)
 	out := map[int]proc{}

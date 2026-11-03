@@ -66,6 +66,8 @@ func main() {
 		Socket:   *core,
 		Resolver: chat.Resolver{Proc: *procDir, Home: *homeDir},
 	}))
+	chatCfg := chat.Config{Socket: *core, Resolver: chat.Resolver{Proc: *procDir, Home: *homeDir}}
+	mux.Handle("GET /api/chat/summaries", chat.SummariesHandler(a, chatCfg, chat.NewSummarizer()))
 	mux.Handle("/", webui.Handler())
 
 	log.Printf("bridge listening on %s", *listen)
