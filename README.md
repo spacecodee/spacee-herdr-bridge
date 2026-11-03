@@ -97,8 +97,8 @@ All routes require the session cookie.
 | --- | --- |
 | `POST /api/session`, `GET /api/session` | Sign in with the token; check the session. |
 | `GET /ws` | WebSocket relayed to herdr-core. |
-| `GET /api/chat?terminal=<address>` | SSE stream of an agent conversation (`reset`, `append`, `update`, `remove`, `none`). |
-| `GET /api/chat/summaries` | Title and last message of every agent terminal. |
+| `GET /api/chat?terminal=<address>` | SSE stream of an agent conversation (`reset`, `append`, `update`, `remove`, `none`). An agent that has not written its transcript yet (before its first message) gets an empty `reset` with its agent name. |
+| `GET /api/chat/summaries` | Title and last message of every agent terminal; an agent before its first message is listed with `messages: 0` and no `last`. |
 | `GET /api/push/key`, `POST`/`DELETE /api/push/subscription`, `POST /api/push/test` | Web Push. |
 | `POST /api/upload` | Store an image (PNG, JPEG, WebP, GIF, at most 15 MiB). |
 | `/api/layout/...` | Spaces, tabs and panes: create, split, rename, move, close. |

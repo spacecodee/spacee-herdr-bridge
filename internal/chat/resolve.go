@@ -35,6 +35,7 @@ const (
 	NoAgent     = "no-agent"
 	Unsupported = "unsupported"
 	NotFound    = "not-found"
+	Waiting     = "waiting" // agent running, no transcript yet (before its first message)
 )
 
 // Resolver maps a terminal's process tree to an agent transcript. Proc and Home are
@@ -73,7 +74,9 @@ type proc struct {
 }
 
 // Resolve finds the transcript of the agent running under t.PID. The reason is one of
-// NoAgent, Unsupported, NotFound when the Source is empty.
+// NoAgent, Unsupported, NotFound when the Source is empty. With Waiting the agent is
+// running but has not written a transcript yet: the Source carries only Agent (and Session
+// when known), with an empty Path.
 func (r Resolver) Resolve(t Terminal) (Source, string) {
 	procs := r.processes()
 	var agents []proc
@@ -85,6 +88,7 @@ func (r Resolver) Resolve(t Terminal) (Source, string) {
 		}
 	}
 	reason := NoAgent
+	var waiting *Source
 	for _, p := range agents {
 		k := kinds[p.pid]
 		if !supported[k] {
@@ -109,6 +113,12 @@ func (r Resolver) Resolve(t Terminal) (Source, string) {
 		if ok {
 			return src, ""
 		}
+		if src.Agent != "" { // running, but no transcript yet
+			waiting = &src
+		}
+	}
+	if waiting != nil {
+		return *waiting, Waiting
 	}
 	return Source{}, reason
 }
@@ -253,10 +263,18 @@ func (r Resolver) claude(p proc) (Source, bool) {
 		strings.NewReplacer("/", "-", ".", "-").Replace(s.CWD),
 		nonAlnum.ReplaceAllString(s.CWD, "-"),
 	}
+	missing := true
 	for _, d := range dirs {
-		if path, ok := inside(root, filepath.Join(root, "projects", d, s.SessionID+".jsonl")); ok {
+		cand := filepath.Join(root, "projects", d, s.SessionID+".jsonl")
+		if path, ok := inside(root, cand); ok {
 			return Source{Agent: "claude", Session: s.SessionID, Path: path, Parser: claudeParser{}}, true
 		}
+		if _, err := os.Lstat(cand); err == nil {
+			missing = false // exists but is refused (symlink out of ~/.claude): not "waiting"
+		}
+	}
+	if missing {
+		return Source{Agent: "claude", Session: s.SessionID}, false // written on the first message
 	}
 	return Source{}, false
 }
@@ -302,7 +320,7 @@ func (r Resolver) pi(p proc, cwd string) (Source, bool) {
 	files, _ := filepath.Glob(filepath.Join(root, "agent", "sessions", dir, "*.jsonl"))
 	path, ok := newestAfter(root, files, p.start)
 	if !ok {
-		return Source{}, false
+		return Source{Agent: "pi"}, false
 	}
 	return Source{Agent: "pi", Session: strings.TrimSuffix(filepath.Base(path), ".jsonl"), Path: path, Parser: piParser{}}, true
 }
@@ -329,7 +347,7 @@ func (r Resolver) codex(p proc, cwd string) (Source, bool) {
 			return Source{Agent: "codex", Session: strings.TrimSuffix(filepath.Base(path), ".jsonl"), Path: path, Parser: codexParser{}}, true
 		}
 	}
-	return Source{}, false
+	return Source{Agent: "codex"}, false
 }
 
 func modTime(p string) time.Time {

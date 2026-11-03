@@ -130,8 +130,8 @@ func TestResolvePiNewestAfterStart(t *testing.T) {
 
 	touch(t, mid, start.Add(-time.Hour))
 	touch(t, newest, start.Add(-time.Hour))
-	if _, why := f.resolver().Resolve(Terminal{PID: 200, CWD: "/work/proj"}); why != "not-found" {
-		t.Errorf("only files older than the process: why=%q, want not-found", why)
+	if _, why := f.resolver().Resolve(Terminal{PID: 200, CWD: "/work/proj"}); why != Waiting {
+		t.Errorf("only files older than the process: why=%q, want waiting", why)
 	}
 }
 
@@ -184,5 +184,30 @@ func TestResolveReasons(t *testing.T) {
 	}
 	if _, why := f.resolver().Resolve(Terminal{PID: 999}); why != "no-agent" {
 		t.Errorf("unknown pid: %q", why)
+	}
+}
+
+func TestResolveWaitingBeforeFirstMessage(t *testing.T) {
+	f := newFixture(t)
+	f.proc_(t, 101, 1, 11, "claude")
+	write(t, filepath.Join(f.home, ".claude/sessions/101.json"), `{"sessionId":"sess-w","cwd":"/work/p"}`)
+	src, why := f.resolver().Resolve(Terminal{PID: 101})
+	if why != Waiting || src.Agent != "claude" || src.Session != "sess-w" || src.Path != "" {
+		t.Fatalf("src=%+v why=%q", src, why)
+	}
+	tr := filepath.Join(f.home, ".claude/projects/-work-p/sess-w.jsonl")
+	write(t, tr, "")
+	src, why = f.resolver().Resolve(Terminal{PID: 101})
+	if why != "" || src.Path != tr {
+		t.Fatalf("after transcript: src=%+v why=%q", src, why)
+	}
+
+	f.proc_(t, 200, 1, 11, "pi")
+	if src, why := f.resolver().Resolve(Terminal{PID: 200, CWD: "/work/p"}); why != Waiting || src.Agent != "pi" || src.Path != "" {
+		t.Errorf("pi: src=%+v why=%q", src, why)
+	}
+	f.proc_(t, 300, 1, 11, "codex")
+	if src, why := f.resolver().Resolve(Terminal{PID: 300, CWD: "/work/p"}); why != Waiting || src.Agent != "codex" {
+		t.Errorf("codex: src=%+v why=%q", src, why)
 	}
 }

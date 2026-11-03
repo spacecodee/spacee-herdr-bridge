@@ -54,6 +54,9 @@ func sumServer(t *testing.T, terms map[string]*Source) (*httptest.Server, *Summa
 		Lookup: func(a string) (Terminal, error) { return Terminal{PID: len(a), CWD: a}, nil },
 		Resolve: func(tm Terminal) (Source, string) {
 			if s := terms[tm.CWD]; s != nil {
+				if s.Path == "" {
+					return *s, Waiting
+				}
 				return *s, ""
 			}
 			return Source{}, NoAgent
@@ -252,5 +255,21 @@ func TestListLiveLocalFiltersRemoteAndFinished(t *testing.T) {
 	got := liveLocal([]byte(`{"terminals":[{"address":"t1","state":"live"},{"address":"t2","state":"finished"},{"address":"mac/t3","state":"live"},{"address":"t4","state":"live"}]}`))
 	if strings.Join(got, ",") != "t1,t4" {
 		t.Fatalf("got %v", got)
+	}
+}
+
+func TestSummaryWaitingTerminalListedAfterConversations(t *testing.T) {
+	p := writeT(t, lines(cuser("u1", "2026-11-02T10:00:00Z", "hi")))
+	srv, _ := sumServer(t, map[string]*Source{
+		"t1": {Agent: "claude", Session: "s", Path: p, Parser: claudeParser{}},
+		"t2": {Agent: "pi", Session: "w"},
+	})
+	got := getSummaries(t, srv)
+	if len(got.Summaries) != 2 || got.Summaries[0].Terminal != "t1" {
+		t.Fatalf("summaries = %+v", got.Summaries)
+	}
+	w := got.Summaries[1]
+	if w.Terminal != "t2" || w.Agent != "pi" || w.Session != "w" || w.Messages != 0 || w.Last != nil || w.Title != "" {
+		t.Errorf("waiting = %+v", w)
 	}
 }

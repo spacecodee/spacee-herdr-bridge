@@ -11,6 +11,7 @@ The web client served by the bridge has its own changelog in `spacee-herdr-front
 
 ### Added
 
+- An agent is recognized before its first message: `/api/chat` sends an empty `reset` with the agent name (instead of `none`/`not-found`) and `/api/chat/summaries` lists the terminal with `messages: 0`, so the app shows its icon and opens the chat right away (Claude Code, pi, Codex, opencode).
 - Chat transcripts show Claude Code messages typed while the agent was working: a message waiting in Claude's queue is sent with `queued: true` and removed through a new `remove` SSE event (`{"ids": [...]}`) once Claude takes it; a queued message delivered in the middle of a turn is now kept as a user message (it used to be missing from the chat). Background task notifications in the queue are not shown.
 
 ## [1.0.0] - 2026-11-02

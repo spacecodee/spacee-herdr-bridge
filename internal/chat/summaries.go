@@ -116,6 +116,10 @@ func (sm *Summarizer) collect(addrs []string, lookup func(string) (Terminal, err
 				return
 			}
 			src, why := resolve(t)
+			if why == Waiting {
+				results[i] = &Summary{Terminal: addr, Agent: src.Agent, Session: src.Session}
+				return
+			}
 			if why != "" || src.Path == "" {
 				return
 			}

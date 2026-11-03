@@ -168,6 +168,10 @@ func (s *session) refresh() {
 		return
 	}
 	src, why := s.c.Resolve(term)
+	if why == Waiting {
+		s.waiting(src)
+		return
+	}
 	if why != "" {
 		s.drop(why)
 		return
@@ -183,6 +187,18 @@ func (s *session) refresh() {
 func (s *session) drop(why string) {
 	s.src, s.tail = nil, nil
 	s.none(why)
+}
+
+// waiting tells the client which agent runs while it has no transcript yet: one empty
+// reset, not repeated on every poll.
+func (s *session) waiting(src Source) {
+	s.src, s.tail = nil, nil
+	key := Waiting + "/" + src.Agent + "/" + src.Session
+	if s.lastNone == key {
+		return
+	}
+	s.lastNone = key
+	s.event("reset", map[string]any{"agent": src.Agent, "session": src.Session, "messages": []Message{}})
 }
 
 func (s *session) none(why string) {

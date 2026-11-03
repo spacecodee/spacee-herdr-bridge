@@ -333,3 +333,32 @@ func TestChatConcurrencyLimit(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 }
+
+func TestStreamWaitingSendsEmptyResetOnceThenRealReset(t *testing.T) {
+	srv, f := newChatServer(t, 8)
+	f.set(Source{Agent: "claude", Session: "s1"}, Waiting)
+	s := openStream(t, srv.URL+"/api/chat?terminal=t9", "")
+	r := s.expect(t, "reset")
+	if r["agent"] != "claude" || r["session"] != "s1" || len(r["messages"].([]any)) != 0 {
+		t.Fatalf("waiting reset = %v", r)
+	}
+	f.fire(t, f.poll) // still waiting: no repeat
+	f.fire(t, f.poll)
+	f.set(claudeSource(tmpTranscript(t, userLine("u1", "hi"))), "")
+	f.fire(t, f.poll)
+	if r := s.expect(t, "reset"); len(r["messages"].([]any)) != 1 {
+		t.Errorf("reset = %v", r)
+	}
+}
+
+func TestStreamNoneThenWaitingStillSendsReset(t *testing.T) {
+	srv, f := newChatServer(t, 8)
+	f.set(Source{}, NotFound)
+	s := openStream(t, srv.URL+"/api/chat?terminal=t9", "")
+	s.expect(t, "none")
+	f.set(Source{Agent: "pi"}, Waiting)
+	f.fire(t, f.poll)
+	if r := s.expect(t, "reset"); r["agent"] != "pi" {
+		t.Errorf("reset = %v", r)
+	}
+}

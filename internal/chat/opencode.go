@@ -65,7 +65,7 @@ func (r Resolver) opencode(cwd string) (Source, bool) {
 	var id string
 	err = db.QueryRow(`SELECT id FROM session_v2 WHERE directory = ? AND parent_id IS NULL ORDER BY time_updated DESC LIMIT 1`, cwd).Scan(&id)
 	if err != nil || !sessionID.MatchString(id) {
-		return Source{}, false
+		return Source{Agent: "opencode"}, false
 	}
 	return Source{Agent: "opencode", Session: id, Path: path + "#" + id, DB: db}, true
 }

@@ -243,8 +243,8 @@ func TestResolveOpenCodeBySessionDirectory(t *testing.T) {
 	if other.Path == src.Path {
 		t.Errorf("different sessions share a Path: %q", src.Path)
 	}
-	if _, why := r.Resolve(Terminal{PID: 600, CWD: "/work/none"}); why != NotFound {
-		t.Errorf("unknown directory: %q", why)
+	if _, why := r.Resolve(Terminal{PID: 600, CWD: "/work/none"}); why != Waiting {
+		t.Errorf("unknown directory: %q, want waiting", why)
 	}
 	if _, why := r.Resolve(Terminal{PID: 600}); why != NotFound {
 		t.Errorf("no cwd: %q", why)
