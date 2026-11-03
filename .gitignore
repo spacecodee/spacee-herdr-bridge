@@ -2,9 +2,5 @@
 /tmp/
 /.atl/
 
-# Local AI-agent workflow files (kept out of the public repo)
-/AGENTS.md
-/CLAUDE.md
-/agents/
-/.herdr/
+# Local task specs and plans for the AI agents (not published)
 /docs/superpowers/
