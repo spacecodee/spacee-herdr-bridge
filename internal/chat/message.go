@@ -269,6 +269,14 @@ type Builder struct {
 	gone  []string        // removed since the last Gone, after the client saw them
 	queue []queued        // the agent's input queue, oldest first
 	qseq  int
+
+	// Branches (see branch.go).
+	cur    string              // record being parsed
+	nodes  map[string]string   // tree records seen -> parent
+	live   map[string]bool     // records on the live branch
+	leaf   string              // newest leaf record: the end of the live branch
+	owners map[string][]string // message id -> records that built it
+	turns  [][]string          // message ids per user turn
 }
 
 // queued is one entry of the agent's input queue. Hidden entries (not typed by the user)
@@ -294,6 +302,10 @@ func (b *Builder) Reset() {
 	b.gone = nil
 	b.queue = nil
 	b.qseq = 0
+	b.cur, b.leaf, b.turns = "", "", nil
+	b.nodes = map[string]string{}
+	b.live = map[string]bool{}
+	b.owners = map[string][]string{}
 }
 
 // Enqueue adds an entry to the agent's input queue; text is its raw content, used to match
@@ -359,12 +371,13 @@ func (b *Builder) remove(id string) {
 	delete(b.byID, id)
 	delete(b.fresh, id)
 	delete(b.dirty, id)
+	delete(b.owners, id)
 }
 
 // Add appends a message, or appends the parts of a message with the same ID (an assistant
 // turn written one block per line).
 func (b *Builder) Add(m Message) {
-	if len(m.Parts) == 0 || m.ID == "" {
+	if len(m.Parts) == 0 || m.ID == "" || !b.visible(b.cur) {
 		return
 	}
 	cur := b.byID[m.ID]
@@ -373,7 +386,11 @@ func (b *Builder) Add(m Message) {
 		b.msgs = append(b.msgs, cur)
 		b.byID[m.ID] = cur
 		b.fresh[m.ID] = true
+		if n := len(b.turns); n > 0 {
+			b.turns[n-1] = append(b.turns[n-1], m.ID)
+		}
 	}
+	b.own(m.ID)
 	for _, p := range m.Parts {
 		cur.Parts = append(cur.Parts, p)
 		if p.Type == "tool" && p.ID != "" {
@@ -406,6 +423,7 @@ func (b *Builder) trim() {
 		delete(b.byID, old.ID)
 		delete(b.fresh, old.ID)
 		delete(b.dirty, old.ID)
+		delete(b.owners, old.ID)
 		for _, p := range old.Parts {
 			delete(b.tools, p.ID)
 		}

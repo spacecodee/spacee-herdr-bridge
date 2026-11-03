@@ -3,6 +3,7 @@ package chat
 import (
 	"database/sql"
 	"encoding/json"
+	"math"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -81,10 +82,53 @@ type ocFollower struct {
 	started bool
 	seq     int64
 	upd     int64
+	lastID  string // id of the row at seq, to notice deleted rows
+	rev     string // session_v2.revert as read on the last full read
+	cap     int64  // rows with seq >= cap are undone (staged revert)
 }
 
 func newOCFollower(db *sql.DB, sid string) *ocFollower {
-	return &ocFollower{db: db, sid: sid, b: NewBuilder(keep), limit: keep}
+	return &ocFollower{db: db, sid: sid, b: NewBuilder(keep), limit: keep, cap: math.MaxInt64}
+}
+
+// revert reads session_v2.revert: set while an /undo is staged (nothing is deleted until
+// the next prompt commits it). A database without the column has no rewinds to hide.
+func ocRevert(db *sql.DB, sid string) string {
+	var rev sql.NullString
+	if db.QueryRow(`SELECT revert FROM session_v2 WHERE id = ?`, sid).Scan(&rev) != nil {
+		return ""
+	}
+	return rev.String
+}
+
+// ocCap is the seq from which the staged revert hides rows: the seq of its message.
+func ocCap(db *sql.DB, sid, rev string) int64 {
+	var r struct {
+		MessageID string `json:"messageID"`
+	}
+	if rev == "" || json.Unmarshal([]byte(rev), &r) != nil || r.MessageID == "" {
+		return math.MaxInt64
+	}
+	var seq int64
+	if db.QueryRow(`SELECT seq FROM session_message WHERE id = ? AND session_id = ?`, r.MessageID, sid).Scan(&seq) != nil {
+		return math.MaxInt64
+	}
+	return seq
+}
+
+// rewound reports whether the rows already read changed under us: the revert was staged,
+// changed or cleared, or the row at the newest seq we saw is gone or another one (a
+// committed rewind deletes rows and later prompts reuse their seq).
+func (f *ocFollower) rewound() bool {
+	if ocRevert(f.db, f.sid) != f.rev {
+		return true
+	}
+	if f.lastID == "" {
+		return false
+	}
+	var id string
+	err := f.db.QueryRow(`SELECT id FROM session_message WHERE session_id = ? AND seq = ?`, f.sid, f.seq).Scan(&id)
+	return err != nil || id != f.lastID
 }
 
 func (f *ocFollower) Builder() *Builder { return f.b }
@@ -95,10 +139,10 @@ type ocRow struct {
 	data            []byte
 }
 
-const ocCols = `SELECT id, type, seq, time_created, time_updated, data FROM session_message WHERE session_id = ?`
+const ocCols = `SELECT id, type, seq, time_created, time_updated, data FROM session_message WHERE session_id = ? AND seq < ?`
 
 func (f *ocFollower) query(q string, args ...any) ([]ocRow, error) {
-	rows, err := f.db.Query(q, append([]any{f.sid}, args...)...)
+	rows, err := f.db.Query(q, append([]any{f.sid, f.cap}, args...)...)
 	if err != nil {
 		return nil, err
 	}
@@ -112,15 +156,21 @@ func (f *ocFollower) query(q string, args ...any) ([]ocRow, error) {
 		if len(r.data) <= maxLine {
 			out = append(out, r)
 		}
-		f.seq, f.upd = max(f.seq, r.seq), max(f.upd, r.u)
+		if r.seq >= f.seq {
+			f.seq, f.lastID = r.seq, r.id
+		}
+		f.upd = max(f.upd, r.u)
 	}
 	return out, rows.Err()
 }
 
-// Poll implements follower: reset is true on the first read.
+// Poll implements follower: reset is true on the first read and after a rewind.
 func (f *ocFollower) Poll() (reset bool, err error) {
 	var rows []ocRow
-	if !f.started {
+	if !f.started || f.rewound() {
+		f.rev = ocRevert(f.db, f.sid)
+		f.cap = ocCap(f.db, f.sid, f.rev)
+		f.seq, f.upd, f.lastID = 0, 0, ""
 		rows, err = f.query(ocCols+` ORDER BY seq DESC LIMIT ?`, f.limit)
 		if err != nil {
 			return false, err
@@ -143,6 +193,7 @@ func (f *ocFollower) Poll() (reset bool, err error) {
 
 // head returns the first n messages of the session.
 func (f *ocFollower) head(n int) ([]Message, error) {
+	f.cap = ocCap(f.db, f.sid, ocRevert(f.db, f.sid))
 	rows, err := f.query(ocCols+` ORDER BY seq LIMIT ?`, n)
 	if err != nil {
 		return nil, err

@@ -54,6 +54,7 @@ type cached struct {
 	size int64
 	mod  time.Time
 	sum  Summary // Terminal is filled per call
+	rev  string  // opencode: the staged revert the summary was built with
 }
 
 // Summarizer builds summaries from the tail of transcripts and remembers them per file
@@ -209,10 +210,11 @@ func (sm *Summarizer) summarizeDB(src Source) (Summary, bool) {
 		return Summary{}, false
 	}
 	mod := time.UnixMilli(upd)
+	rev := ocRevert(src.DB, src.Session)
 	sm.mu.Lock()
 	e, ok := sm.cache[src.Path]
 	sm.mu.Unlock()
-	if ok && e.size == n && e.mod.Equal(mod) {
+	if ok && e.size == n && e.mod.Equal(mod) && e.rev == rev {
 		return e.sum, true
 	}
 
@@ -230,7 +232,7 @@ func (sm *Summarizer) summarizeDB(src Source) (Summary, bool) {
 			s.Title = firstTitle(head)
 		}
 	}
-	sm.store(src.Path, cached{size: n, mod: mod, sum: s})
+	sm.store(src.Path, cached{size: n, mod: mod, sum: s, rev: rev})
 	return s, true
 }
 

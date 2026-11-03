@@ -17,6 +17,7 @@ The web client served by the bridge has its own changelog in `spacee-herdr-front
 
 - Images built locally with `docker compose` report their version instead of `dev` (`BRIDGE_BUILD_VERSION`).
 - `scripts/build.sh` tags the image `ghcr.io/spacecodee/spacee-herdr-bridge`, and `release.sh` builds with the release version instead of a `-dirty` git describe.
+- The chat shows only the live branch after a rewind: Claude Code (`/rewind`), pi (`/tree`), Codex (backtrack) and opencode (`/undo`, `/redo`) no longer render abandoned messages, in the conversation view and in the home summaries.
 
 ## [1.2.1] - 2026-11-03
 

@@ -22,6 +22,17 @@ func (piParser) Line(line []byte, b *Builder) {
 			Details      json.RawMessage `json:"details"`
 		} `json:"message"`
 	}
+	var h struct {
+		Type     string `json:"type"`
+		ID       string `json:"id"`
+		ParentID string `json:"parentId"`
+	}
+	if json.Unmarshal(line, &h) != nil {
+		return
+	}
+	if h.Type != "session" { // the header is not part of the tree
+		b.Node(h.ID, h.ParentID, true, true)
+	}
 	if json.Unmarshal(line, &r) != nil || r.Type != "message" {
 		return
 	}

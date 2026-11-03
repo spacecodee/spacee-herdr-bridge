@@ -11,7 +11,7 @@ import (
 )
 
 const ocSchema = `
-CREATE TABLE session_v2 (id text PRIMARY KEY, parent_id text, directory text NOT NULL, title text,
+CREATE TABLE session_v2 (id text PRIMARY KEY, parent_id text, directory text NOT NULL, title text, revert text,
   time_created integer NOT NULL, time_updated integer NOT NULL);
 CREATE TABLE session_message (id text PRIMARY KEY, session_id text NOT NULL, type text NOT NULL,
   seq integer NOT NULL, time_created integer NOT NULL, time_updated integer NOT NULL, data text NOT NULL);
@@ -301,5 +301,133 @@ func TestSummarizeOpenCodeTitleFromHeadWhenTailHasNone(t *testing.T) {
 	s, ok := NewSummarizer().summarize(src)
 	if !ok || s.Title != "the very first ask" {
 		t.Fatalf("summary = %+v ok=%v", s, ok)
+	}
+}
+
+// --- rewind (revert) ---
+
+func (f *ocFixture) setRevert(session, messageID string) {
+	f.t.Helper()
+	var v any
+	if messageID != "" {
+		v = `{"messageID":"` + messageID + `","snapshot":"abc"}`
+	}
+	f.exec(`UPDATE session_v2 SET revert = ? WHERE id = ?`, v, session)
+}
+
+// dropFrom deletes the messages with seq >= seq, as a committed rewind does.
+func (f *ocFixture) dropFrom(session string, seq int) {
+	f.t.Helper()
+	f.exec(`DELETE FROM session_message WHERE session_id = ? AND seq >= ?`, session, seq)
+	f.seq[session] = seq - 1
+}
+
+func ocTexts(f *ocFollower) []string { return texts(f.Builder()) }
+
+func ocConversation(f *ocFixture) {
+	f.session("ses_1", "/w", 1, "")
+	f.msg("ses_1", "m1", "user", 1000, `{"text":"one","time":{"created":1000}}`)
+	f.msg("ses_1", "m2", "assistant", 1001, `{"content":[{"type":"text","text":"ans one"}]}`)
+	f.msg("ses_1", "m3", "user", 1002, `{"text":"two","time":{"created":1002}}`)
+	f.msg("ses_1", "m4", "assistant", 1003, `{"content":[{"type":"text","text":"ans two"}]}`)
+}
+
+func TestOpenCodeStagedRevertHidesTheUndoneMessages(t *testing.T) {
+	f := newOCFixture(t)
+	ocConversation(f)
+	f.setRevert("ses_1", "m3")
+	fl := newOCFollower(f.reader(t), "ses_1")
+	if reset, err := fl.Poll(); err != nil || !reset {
+		t.Fatalf("first poll reset=%v err=%v", reset, err)
+	}
+	same(t, ocTexts(fl), "user:one", "assistant:ans one")
+}
+
+func TestOpenCodeRevertStagedAndClearedWhileFollowing(t *testing.T) {
+	f := newOCFixture(t)
+	ocConversation(f)
+	fl := newOCFollower(f.reader(t), "ses_1")
+	fl.Poll()
+	same(t, ocTexts(fl), "user:one", "assistant:ans one", "user:two", "assistant:ans two")
+	fl.Builder().Drain()
+
+	f.setRevert("ses_1", "m3") // /undo
+	if reset, err := fl.Poll(); err != nil || !reset {
+		t.Fatalf("staged revert: reset=%v err=%v", reset, err)
+	}
+	same(t, ocTexts(fl), "user:one", "assistant:ans one")
+
+	if reset, err := fl.Poll(); err != nil || reset {
+		t.Fatalf("nothing changed: reset=%v err=%v", reset, err)
+	}
+
+	f.setRevert("ses_1", "") // /redo
+	if reset, err := fl.Poll(); err != nil || !reset {
+		t.Fatalf("cleared revert: reset=%v err=%v", reset, err)
+	}
+	same(t, ocTexts(fl), "user:one", "assistant:ans one", "user:two", "assistant:ans two")
+}
+
+func TestOpenCodeCommittedRewindResets(t *testing.T) {
+	f := newOCFixture(t)
+	ocConversation(f)
+	f.setRevert("ses_1", "m3")
+	fl := newOCFollower(f.reader(t), "ses_1")
+	fl.Poll()
+
+	// the next prompt commits: rows >= seq 3 are deleted, revert cleared, a new prompt takes seq 3
+	f.dropFrom("ses_1", 3)
+	f.setRevert("ses_1", "")
+	f.msg("ses_1", "m5", "user", 2000, `{"text":"new two","time":{"created":2000}}`)
+	if reset, err := fl.Poll(); err != nil || !reset {
+		t.Fatalf("committed rewind: reset=%v err=%v", reset, err)
+	}
+	same(t, ocTexts(fl), "user:one", "assistant:ans one", "user:new two")
+}
+
+func TestOpenCodeDeletedRowsWithoutStagingReset(t *testing.T) {
+	f := newOCFixture(t)
+	ocConversation(f)
+	fl := newOCFollower(f.reader(t), "ses_1")
+	fl.Poll()
+	f.dropFrom("ses_1", 3)
+	f.msg("ses_1", "m5", "user", 2000, `{"text":"replaced","time":{"created":2000}}`)
+	f.msg("ses_1", "m6", "assistant", 2001, `{"content":[{"type":"text","text":"ans"}]}`)
+	f.msg("ses_1", "m7", "user", 2002, `{"text":"more","time":{"created":2002}}`)
+	if reset, err := fl.Poll(); err != nil || !reset {
+		t.Fatalf("reset=%v err=%v", reset, err)
+	}
+	same(t, ocTexts(fl), "user:one", "assistant:ans one", "user:replaced", "assistant:ans", "user:more")
+}
+
+func TestOpenCodeWithoutRevertRendersAsBefore(t *testing.T) {
+	f := newOCFixture(t)
+	ocConversation(f)
+	fl := newOCFollower(f.reader(t), "ses_1")
+	fl.Poll()
+	fl.Builder().Drain()
+	f.msg("ses_1", "m5", "user", 3000, `{"text":"three","time":{"created":3000}}`)
+	if reset, err := fl.Poll(); err != nil || reset {
+		t.Fatalf("append: reset=%v err=%v", reset, err)
+	}
+	added, _ := fl.Builder().Drain()
+	if len(added) != 1 || added[0].ID != "m5" {
+		t.Fatalf("added = %+v", added)
+	}
+}
+
+func TestSummarizeOpenCodeUsesTheLiveBranch(t *testing.T) {
+	f := newOCFixture(t)
+	ocConversation(f)
+	src := Source{Agent: "opencode", Session: "ses_1", Path: f.path + "#ses_1", DB: f.reader(t)}
+	sm := NewSummarizer()
+	s, _ := sm.summarize(src)
+	if s.Messages != 4 || s.Last.Text != "ans two" {
+		t.Fatalf("summary = %+v", s)
+	}
+	f.setRevert("ses_1", "m3") // same rows and update times: only the staged revert changed
+	s, _ = sm.summarize(src)
+	if s.Messages != 2 || s.Last.Text != "ans one" {
+		t.Fatalf("after /undo: %+v", s)
 	}
 }

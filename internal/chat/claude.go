@@ -1,6 +1,7 @@
 package chat
 
 import (
+	"bytes"
 	"encoding/json"
 	"regexp"
 	"strings"
@@ -62,6 +63,30 @@ func (claudeParser) Line(line []byte, b *Builder) {
 			Content json.RawMessage `json:"content"`
 		} `json:"message"`
 	}
+	// The tree fields are read apart: a record whose body has an unexpected shape still
+	// links its children to their parents.
+	var h struct {
+		Type        string `json:"type"`
+		UUID        string `json:"uuid"`
+		ParentUUID  string `json:"parentUuid"`
+		LogicalUUID string `json:"logicalParentUuid"` // the parent across a compaction boundary
+		IsSidechain bool   `json:"isSidechain"`
+		IsMeta      bool   `json:"isMeta"`
+		Message     struct {
+			Content json.RawMessage `json:"content"`
+		} `json:"message"`
+	}
+	if json.Unmarshal(line, &h) != nil || h.IsSidechain {
+		return
+	}
+	parent := h.ParentUUID
+	if parent == "" {
+		parent = h.LogicalUUID
+	}
+	// A rewind shows as a new prompt under an older record. Tool results are users too, but
+	// parallel calls answer on branches of their own.
+	prompt := h.Type == "user" && !h.IsMeta && !bytes.Contains(h.Message.Content, []byte(`"tool_result"`))
+	b.Node(h.UUID, parent, h.Type == "user" || h.Type == "assistant", prompt)
 	if json.Unmarshal(line, &r) != nil || r.IsMeta || r.IsSidechain {
 		return
 	}

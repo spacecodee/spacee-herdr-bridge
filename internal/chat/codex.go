@@ -26,12 +26,20 @@ func (codexParser) Line(line []byte, b *Builder) {
 			Summary   []struct{ Text string } `json:"summary"`
 			CallID    string                  `json:"call_id"`
 			Name      string                  `json:"name"`
+			NumTurns  int                     `json:"num_turns"`
 			Arguments string                  `json:"arguments"`
 			Input     string                  `json:"input"`
 			Output    json.RawMessage         `json:"output"`
 		} `json:"payload"`
 	}
-	if json.Unmarshal(line, &r) != nil || r.Type != "response_item" {
+	if json.Unmarshal(line, &r) != nil {
+		return
+	}
+	if r.Type == "event_msg" && r.Payload.Type == "thread_rolled_back" {
+		b.Rollback(r.Payload.NumTurns)
+		return
+	}
+	if r.Type != "response_item" {
 		return
 	}
 	p := r.Payload
@@ -64,6 +72,9 @@ func (codexParser) Line(line []byte, b *Builder) {
 			case "input_image":
 				parts = append(parts, imagePart())
 			}
+		}
+		if p.Role == "user" && len(parts) > 0 { // a real prompt (injected context has no parts) starts a turn
+			b.StartTurn()
 		}
 		msg(p.Role, parts...)
 	case "reasoning":

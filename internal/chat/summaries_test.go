@@ -335,3 +335,19 @@ func TestSummaryAskingCodex(t *testing.T) {
 		t.Fatalf("codex asking = %+v", s.Asking)
 	}
 }
+
+func TestSummaryUsesTheLiveBranch(t *testing.T) {
+	path := t.TempDir() + "/s.jsonl"
+	lines := []string{
+		cu("u1", "", "first"), ca("a1", "u1", "m1", "answer one"),
+		cu("u2", "a1", "abandoned"), ca("a2", "u2", "m2", "abandoned answer"),
+		cu("u3", "a1", "second"), ca("a3", "u3", "m3", "final answer"),
+	}
+	if err := writeFile(path, strings.Join(lines, "\n")+"\n"); err != nil {
+		t.Fatal(err)
+	}
+	s, ok := NewSummarizer().summarize(Source{Agent: "claude", Path: path, Parser: claudeParser{}})
+	if !ok || s.Messages != 4 || s.Title != "first" || s.Last == nil || s.Last.Text != "final answer" {
+		t.Fatalf("summary = %+v ok=%v", s, ok)
+	}
+}
