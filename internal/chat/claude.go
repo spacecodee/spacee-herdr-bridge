@@ -2,8 +2,29 @@ package chat
 
 import (
 	"encoding/json"
+	"regexp"
 	"strings"
 )
+
+var (
+	// A slash command is written as a user message made only of these tags.
+	commandMarkup = regexp.MustCompile(`^\s*<command-name>([^<]*)</command-name>\s*(?:<command-message>[^<]*</command-message>\s*)?(?:<command-args>([^<]*)</command-args>\s*)?$`)
+	// Its output is a user message made only of this tag.
+	commandStdout = regexp.MustCompile(`^\s*<local-command-stdout>([\s\S]*)</local-command-stdout>\s*$`)
+)
+
+// slashCommand rewrites a user message that is only slash-command markup: the command as the
+// user typed it, or the command's output as a system message. drop is true for empty output.
+func slashCommand(s string) (role, text string, drop, ok bool) {
+	if m := commandMarkup.FindStringSubmatch(s); m != nil {
+		return "user", strings.TrimSpace(strings.TrimSpace(m[1]) + " " + strings.TrimSpace(m[2])), false, true
+	}
+	if m := commandStdout.FindStringSubmatch(s); m != nil {
+		text = strings.TrimSpace(m[1])
+		return "system", text, text == "", true
+	}
+	return "", "", false, false
+}
 
 // claudeParser reads Claude Code transcripts (~/.claude/projects/<dir>/<session>.jsonl).
 type claudeParser struct{}
@@ -77,7 +98,16 @@ func (claudeParser) Line(line []byte, b *Builder) {
 		}
 		var parts []Part
 		var s string
+		role := r.Type
 		if json.Unmarshal(r.Message.Content, &s) == nil {
+			if r.Type == "user" {
+				if cr, ct, drop, ok := slashCommand(s); ok {
+					if drop {
+						return
+					}
+					role, s = cr, ct
+				}
+			}
 			if s != "" {
 				parts = append(parts, textPart("text", s))
 			}
@@ -105,6 +135,6 @@ func (claudeParser) Line(line []byte, b *Builder) {
 				}
 			}
 		}
-		b.Add(Message{ID: id, Role: r.Type, Time: r.Timestamp, Parts: parts})
+		b.Add(Message{ID: id, Role: role, Time: r.Timestamp, Parts: parts})
 	}
 }

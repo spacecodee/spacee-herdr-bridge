@@ -300,3 +300,35 @@ func TestBuilderKeepsOnlyTheLastN(t *testing.T) {
 	}
 	b.Result("nope", "x", false) // unknown call id: ignored
 }
+
+func TestClaudeSlashCommandMarkup(t *testing.T) {
+	cmd := func(name, args string) string {
+		return "<command-name>" + name + "</command-name>\\n            <command-message>" + name[1:] + "</command-message>\\n            <command-args>" + args + "</command-args>"
+	}
+	line := func(id, content string) string {
+		return `{"type":"user","uuid":"` + id + `","timestamp":"T","message":{"role":"user","content":"` + content + `"}}`
+	}
+	b := feed(claudeParser{},
+		line("c1", cmd("/clear", "")),
+		line("c2", cmd("/model", "opus")),
+		line("o1", "<local-command-stdout>Set model to opus</local-command-stdout>"),
+		line("o2", "<local-command-stdout></local-command-stdout>"),
+		line("p1", "use <command-name>x</command-name> in prose"),
+	)
+	ms := snap(b)
+	if len(ms) != 4 {
+		t.Fatalf("got %d messages, want 4: %+v", len(ms), ms)
+	}
+	want := []struct{ id, role, text string }{
+		{"c1", "user", "/clear"},
+		{"c2", "user", "/model opus"},
+		{"o1", "system", "Set model to opus"},
+		{"p1", "user", "use <command-name>x</command-name> in prose"},
+	}
+	for i, w := range want {
+		m := ms[i]
+		if m.ID != w.id || m.Role != w.role || m.Time != "T" || len(m.Parts) != 1 || m.Parts[0].Text != w.text {
+			t.Errorf("message %d = %+v, want %+v", i, m, w)
+		}
+	}
+}
