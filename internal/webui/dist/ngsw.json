@@ -1,6 +1,6 @@
 {
   "configVersion": 1,
-  "timestamp": 1793714598339,
+  "timestamp": 1793720974083,
   "index": "/index.html",
   "assetGroups": [
     {
@@ -15,16 +15,19 @@
         "/agents/claude-color.svg",
         "/agents/codex-color.svg",
         "/agents/gemini-color.svg",
+        "/agents/neovim.svg",
         "/agents/opencode.svg",
         "/agents/pi-192.webp",
         "/agents/pi-96.webp",
-        "/chunk-0XgJ966z.js",
-        "/chunk-B7_fhJnW.js",
-        "/chunk-Cncw1IR-.js",
-        "/chunk-Cv_gGnv4.js",
-        "/chunk-DGbFt5ww.js",
-        "/chunk-DQL0nxht.js",
-        "/chunk-Duj1XOny.js",
+        "/agents/vim.svg",
+        "/chunk-C83uH80l.js",
+        "/chunk-CEpUY6PR.js",
+        "/chunk-CXLmsGnB.js",
+        "/chunk-CfG9UWEa.js",
+        "/chunk-D3F6dFE6.js",
+        "/chunk-D5dlvf1n.js",
+        "/chunk-DERoPju_.js",
+        "/chunk-DNe5hGxY.js",
         "/favicon.ico",
         "/icons/apple-touch-icon.png",
         "/icons/favicon-32.png",
@@ -33,9 +36,9 @@
         "/icons/icon-maskable-512.png",
         "/icons/icon.svg",
         "/index.html",
-        "/main-543QIA2P.js",
+        "/main-6R5J3G6B.js",
         "/manifest.webmanifest",
-        "/styles-VHOO43CE.css"
+        "/styles-IWDETNBE.css"
       ],
       "patterns": []
     },
@@ -47,6 +50,7 @@
         "ignoreVary": true
       },
       "urls": [
+        "/fonts/Geist-Variable.woff2",
         "/fonts/JetBrainsMonoNFM-Bold.woff2",
         "/fonts/JetBrainsMonoNFM-Regular.woff2"
       ],
@@ -59,17 +63,21 @@
     "/agents/claude-color.svg": "c01363e8c27c3038df647c6be1cf7ab2ff74f3a9",
     "/agents/codex-color.svg": "4888b56b2403bdea37c4ac1a9530fff10399061e",
     "/agents/gemini-color.svg": "691272bee2d44f448bddf672bfbed81c5a30d870",
+    "/agents/neovim.svg": "0b806e8431792c85dc6a46a98e085200e3d5c23b",
     "/agents/opencode.svg": "8b6c58cf37c7c984e8fc6151132171279ffc6a41",
     "/agents/pi-192.webp": "2e9e6611b60e757ca320886a889496075ada8ce8",
     "/agents/pi-96.webp": "005b25467e77f04cf893a0e3106a861a77f040fd",
-    "/chunk-0XgJ966z.js": "1673424f319386ba3f79ed88f792fb4c5d69190b",
-    "/chunk-B7_fhJnW.js": "59dd2d3426fbb4531d12d11f076035abed656afd",
-    "/chunk-Cncw1IR-.js": "9ab9594ece0916dea5dcf85e225e238a47608f80",
-    "/chunk-Cv_gGnv4.js": "823b5db84a89fc4404cb6890ed6e9030182e81b1",
-    "/chunk-DGbFt5ww.js": "2dc4dcbc509cfd1dd0b9c45a4559d45636e5cdd3",
-    "/chunk-DQL0nxht.js": "f6675e97fd345f12d1990a2d72932cba3aa27316",
-    "/chunk-Duj1XOny.js": "bc5d300e3afb2ced43a03af3ac2abd600287542a",
+    "/agents/vim.svg": "3deb4a4440ea331e70e2144b366b2feabf4e8422",
+    "/chunk-C83uH80l.js": "263d80a65758b065283cc29cf69fe68111c67614",
+    "/chunk-CEpUY6PR.js": "c210c715798ec25cb7f0e4a54ce2a0f6ad312701",
+    "/chunk-CXLmsGnB.js": "6d6f23cc1ee7e0d0c1923a83fa7a63d611ebacf9",
+    "/chunk-CfG9UWEa.js": "0d5075e16124c164ae25174cbbc08420315dcbe9",
+    "/chunk-D3F6dFE6.js": "bd6249fc7cc57ea06fa48c55cca607d19aa28ce5",
+    "/chunk-D5dlvf1n.js": "0ac23ef2ee72be492ea849e9ce0d706433b76679",
+    "/chunk-DERoPju_.js": "ac79406582754691fd356a43245a904dc0e5b2c6",
+    "/chunk-DNe5hGxY.js": "743dbfa0ed197d627eed33e83647cdb83ee66b9e",
     "/favicon.ico": "73e26c0c4b1ba7f970aca2cdba6993838d6a2a65",
+    "/fonts/Geist-Variable.woff2": "0b505452d42e5008508c556009f646ccada37680",
     "/fonts/JetBrainsMonoNFM-Bold.woff2": "fa1465f712764bf20313aba822eeadc570bc8418",
     "/fonts/JetBrainsMonoNFM-Regular.woff2": "a96f1548b18840db5606e766793c61e15434a248",
     "/icons/apple-touch-icon.png": "8271c3aa25cf9956ed9443ef396a869eb0dd2d87",
@@ -78,10 +86,10 @@
     "/icons/icon-512.png": "afd59b88f2b22de0a0271ba0f7b7c5c26877a997",
     "/icons/icon-maskable-512.png": "afd59b88f2b22de0a0271ba0f7b7c5c26877a997",
     "/icons/icon.svg": "b8981656ec5f78657aa4679a5df5db5135a5f188",
-    "/index.html": "961f9798d7a9ee83024b0e9cd280af53ffba7d11",
-    "/main-543QIA2P.js": "faff95f0c0d0ee3959fc1841429985be281256a4",
-    "/manifest.webmanifest": "ea9f1e148352b370ef9d414b3e81e4d87ac981e1",
-    "/styles-VHOO43CE.css": "6e29d0ab0e93207e2750a10610907fcd75674e77"
+    "/index.html": "68fe0f41e474854f22b083a82a104ab34fe2c1e0",
+    "/main-6R5J3G6B.js": "b5deb42e1501cd8e7c513d9fbf00255cc771fdce",
+    "/manifest.webmanifest": "50e003e7250f50871e1be4b5478fef836dac5a83",
+    "/styles-IWDETNBE.css": "054ab1c1ef099a750db5cc910b69a01a5c65971a"
   },
   "navigationUrls": [
     {
