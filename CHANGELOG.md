@@ -9,6 +9,8 @@ The web client served by the bridge has its own changelog in `spacee-herdr-front
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-03
+
 ### Added
 
 - Per-device sessions: each login creates a device (id, name, platform from the User-Agent) kept in `devices.json` beside the token (mode 0600, at most 20; signing in on one more signs out the least recently seen). `GET /api/devices` lists them (`current` marks the caller), `PATCH /api/devices/{id}` renames, `DELETE /api/devices/{id}` and `DELETE /api/session` sign a device out: its push subscriptions are removed and its open `/ws` and `/api/chat` streams close within a second.
@@ -53,5 +55,6 @@ The web client served by the bridge has its own changelog in `spacee-herdr-front
 
 - PWA serving: a missing file (`/ngsw.json`, `/nope.js`) now returns 404 instead of `index.html`; only extensionless app routes fall back to the SPA. `.webmanifest` is served as `application/manifest+json`, and cache headers are set (`no-cache` for `index.html`, the service worker and the manifest; immutable for hashed build files; one day for icons and fonts) so updates reach installed apps.
 
-[unreleased]: https://github.com/spacecodee/spacee-herdr-bridge/compare/v1.0.0...HEAD
+[unreleased]: https://github.com/spacecodee/spacee-herdr-bridge/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/spacecodee/spacee-herdr-bridge/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/spacecodee/spacee-herdr-bridge/releases/tag/v1.0.0
