@@ -9,6 +9,8 @@ The web client served by the bridge has its own changelog in `spacee-herdr-front
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-11-03
+
 ### Added
 
 - Prebuilt multi-arch image (`linux/amd64`, `linux/arm64`) on `ghcr.io/spacecodee/spacee-herdr-bridge`, with OCI labels; `docker compose pull && docker compose up -d` runs it, `BRIDGE_VERSION` pins a release. `release.sh --push-image` builds from the release tag in a temporary worktree and always logs out of `ghcr.io` afterwards.
@@ -72,7 +74,8 @@ The web client served by the bridge has its own changelog in `spacee-herdr-front
 
 - PWA serving: a missing file (`/ngsw.json`, `/nope.js`) now returns 404 instead of `index.html`; only extensionless app routes fall back to the SPA. `.webmanifest` is served as `application/manifest+json`, and cache headers are set (`no-cache` for `index.html`, the service worker and the manifest; immutable for hashed build files; one day for icons and fonts) so updates reach installed apps.
 
-[unreleased]: https://github.com/spacecodee/spacee-herdr-bridge/compare/v1.2.0...HEAD
+[unreleased]: https://github.com/spacecodee/spacee-herdr-bridge/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/spacecodee/spacee-herdr-bridge/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/spacecodee/spacee-herdr-bridge/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/spacecodee/spacee-herdr-bridge/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/spacecodee/spacee-herdr-bridge/releases/tag/v1.0.0
