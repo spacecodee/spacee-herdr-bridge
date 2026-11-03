@@ -1,1 +1,0 @@
-import{C as Ew,h as D}from"./chunk-CDP8dWhp.js";import{F as K,P as E,R as ie}from"./main-U6SGLQNU.js";function p(t){let n=D(K);return D(E).ensureOpen().then(()=>n.ensureStarted()).catch(()=>{}),{machine:ie(t)??``,cwd:Ew(()=>n.terminals().find(m=>m.address===t)?.cwd??``)}}export{p as t};
