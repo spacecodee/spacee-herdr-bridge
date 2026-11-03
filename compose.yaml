@@ -11,7 +11,10 @@ services:
       XDG_CONFIG_HOME: /config
     # Appended to the image entrypoint. Same absolute path inside and outside the container, so the
     # path the bridge returns for an uploaded image is valid on the host, where the agents run.
-    command: ["-upload-dir", "${HOME}/.cache/spacee-herdr/uploads"]
+    command: ["-upload-dir", "${HOME}/.cache/spacee-herdr/uploads", "-home", "${HOME}"]
+    # The host PID namespace: /api/chat walks a terminal's process tree to find which agent session
+    # it runs. See "Chat transcripts" in docs/host-setup.md for what this does (and does not) expose.
+    pid: host
     ports:
       # Host loopback only: the single way in is `tailscale serve` on the host.
       - "127.0.0.1:8080:8080"
@@ -34,5 +37,25 @@ services:
       - type: bind
         source: ${HOME}/.cache/spacee-herdr/uploads
         target: ${HOME}/.cache/spacee-herdr/uploads
+        bind:
+          create_host_path: false
+      # Agent transcripts for /api/chat, read-only, at the same absolute paths as on the host
+      # (the sessions/<pid>.json files and the transcripts hold host paths). They must exist.
+      - type: bind
+        source: ${HOME}/.claude
+        target: ${HOME}/.claude
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${HOME}/.pi
+        target: ${HOME}/.pi
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${HOME}/.codex
+        target: ${HOME}/.codex
+        read_only: true
         bind:
           create_host_path: false

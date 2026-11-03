@@ -122,6 +122,9 @@ What `compose.yaml` does:
   `/run/user/<uid>` is mounted after Docker starts at boot, and when hc recreates it;
 - mounts `~/.config/spacee-herdr` for the token;
 - mounts `~/.cache/spacee-herdr/uploads` at the same absolute path, for images uploaded from the phone;
+- mounts `~/.claude`, `~/.pi` and `~/.codex` read-only at the same absolute paths, so the chat
+  view (`/api/chat`) can read the agents' transcripts (they must exist before the first start);
+- runs in the host PID namespace (`pid: host`), see "Chat transcripts" below;
 - publishes port 8080 on host loopback only (`127.0.0.1:8080`). Never change it to
   `8080:8080` or a tailnet IP: Docker's published ports bypass `ufw`, and the only way in
   must be `tailscale serve`;
@@ -141,6 +144,33 @@ curl -s http://127.0.0.1:8080/healthz      # ok
 `~/.cache/spacee-herdr/uploads` holds the images you send from the phone to agents (PNG, JPEG,
 WebP, GIF, at most 15 MiB, mode 0600). The bridge returns their path on the host, which is
 where the agents read them. Files older than 7 days are deleted at startup and then hourly.
+
+### Chat transcripts (`/api/chat`)
+
+`GET /api/chat?terminal=<address>` streams the normalized transcript of the coding agent
+running in a terminal (Claude Code, pi, Codex) so the web client can show it as a chat.
+It is read-only: input still goes through the terminal. To do that the bridge:
+
+1. asks core (`terminal.get`) for the terminal's foreground process id and directory;
+2. walks that process's descendants in `/proc` (the agent is often a child of a wrapper) and
+   recognizes the agent by its executable or first arguments;
+3. finds its transcript: Claude Code via `~/.claude/sessions/<pid>.json`; pi and Codex as the
+   newest session file in the terminal's directory modified after the process started.
+
+Why `pid: host`: without it the container sees only its own processes, so step 2 is impossible.
+What it changes: the container can **see** the processes of the host (list them, read their
+`cmdline` and `stat`; `/proc/<pid>/environ` and `fd` stay private to other users). It adds no
+capability and stays non-root, but as the same uid it could now also signal your processes
+(`kill`) and read same-uid process details such as `environ`. That adds no real power: the
+container already holds core's socket, which is a shell as you on the host. `cmdline` may
+contain secrets passed as arguments; the bridge reads it only to match an agent name and never
+logs or returns it.
+
+Other safeguards: the bridge only opens files under `~/.claude`, `~/.pi` and `~/.codex`
+(symlinks resolved, anything outside refused), mounted read-only; it never logs message
+contents or paths; at most 8 chat streams at once (`429` beyond); and the endpoint needs the
+session cookie and a same-origin request like the rest of the API. Remote terminals
+(`machine/tN`) and other agents (opencode, agy) answer `none` for now.
 
 On first start the bridge creates the token at `~/.config/spacee-herdr/token` (mode 0600).
 To keep the token when moving to a new machine, copy that file (mode 0600) before the first

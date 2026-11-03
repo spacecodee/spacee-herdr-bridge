@@ -5,10 +5,12 @@ import (
 	"flag"
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/spacecodee/spacee-herdr-bridge/internal/auth"
+	"github.com/spacecodee/spacee-herdr-bridge/internal/chat"
 	"github.com/spacecodee/spacee-herdr-bridge/internal/coreproxy"
 	"github.com/spacecodee/spacee-herdr-bridge/internal/push"
 	"github.com/spacecodee/spacee-herdr-bridge/internal/upload"
@@ -20,6 +22,9 @@ func main() {
 	core := flag.String("core", coreproxy.DefaultSocketPath(), "herdr-core Unix socket path")
 	subject := flag.String("push-subject", "https://github.com/spacecodee/spacee-herdr-bridge", "VAPID subject for Web Push (https: or mailto: URL)")
 	uploadDir := flag.String("upload-dir", upload.DefaultDir(), "directory for uploaded images (must be a path valid on the host: agents read the images from there)")
+	home, _ := os.UserHomeDir()
+	homeDir := flag.String("home", home, "host home directory whose ~/.claude, ~/.pi and ~/.codex hold the agent transcripts (read-only)")
+	procDir := flag.String("proc", "/proc", "procfs to find the agent processes of a terminal (the container needs pid: host)")
 	flag.Parse()
 
 	tokenPath := auth.DefaultTokenPath()
@@ -57,6 +62,10 @@ func main() {
 	mux.Handle("GET /ws", a.Require(coreproxy.Handler(*core)))
 	mux.Handle("/api/push/", push.Handler(a, subs, vapid.Public, sender))
 	mux.Handle("/api/upload", upload.Handler(a, *uploadDir))
+	mux.Handle("GET /api/chat", chat.Handler(a, chat.Config{
+		Socket:   *core,
+		Resolver: chat.Resolver{Proc: *procDir, Home: *homeDir},
+	}))
 	mux.Handle("/", webui.Handler())
 
 	log.Printf("bridge listening on %s", *listen)
