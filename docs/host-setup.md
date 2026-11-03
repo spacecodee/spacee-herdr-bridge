@@ -1,37 +1,37 @@
 # Host setup: bridge + Tailscale
 
-Goal: open the herdr-core terminals of the Linux host (`workstation`) from the iPhone, reachable
+Goal: open the herdr-core terminals of the Linux host (`<host>`) from the iPhone, reachable
 only by your own devices on the tailnet. Nothing is exposed to the internet, and tagged
-machines such as the Dokploy VPS cannot reach it.
+servers in your tailnet cannot reach it.
 
 ```
-iPhone (Tailscale app) --https--> workstation:443 (tailscale serve) --> 127.0.0.1:8080 (bridge container) --> hc socket
+iPhone (Tailscale app) --https--> <host>:443 (tailscale serve) --> 127.0.0.1:8080 (bridge container) --> hc socket
 ```
 
 | Piece | Listens on | Who can reach it |
 | --- | --- | --- |
-| bridge (Docker container) | published on host `127.0.0.1:8080` | only processes on workstation |
-| `tailscale serve` | workstation tailnet address, port 443 | devices allowed by the tailnet policy: your own (`autogroup:member`) |
-| herdr-core (`hc`) | Unix socket `/run/user/<uid>/herdr-core/default.sock` | only your user on workstation |
+| bridge (Docker container) | published on host `127.0.0.1:8080` | only processes on <host> |
+| `tailscale serve` | <host> tailnet address, port 443 | devices allowed by the tailnet policy: your own (`autogroup:member`) |
+| herdr-core (`hc`) | Unix socket `/run/user/<uid>/herdr-core/default.sock` | only your user on <host> |
 
 Why this shape:
 
 - **Core has no authentication.** Whoever reaches the bridge with the token has a shell on
-  workstation and on every machine added with `hc machine add`. Every layer below exists to keep
+  <host> and on every machine added with `hc machine add`. Every layer below exists to keep
   that set of people at one: you.
 - **HTTPS is required.** The session cookie is `Secure` and Safari needs a secure context for
   the PWA. `tailscale serve` provides HTTPS with a valid certificate for
-  `workstation.<tailnet>.ts.net`, so the bridge does not handle TLS.
+  `<host>.<tailnet>.ts.net`, so the bridge does not handle TLS.
 - **`serve`, never `funnel`.** `serve` is tailnet-only; `funnel` publishes to the internet.
 
-Follow the steps in order. Commands run on workstation unless a step says otherwise.
+Follow the steps in order. Commands run on <host> unless a step says otherwise.
 
 ## 1. Prerequisites
 
 ```sh
 systemctl --user is-enabled herdr-core   # core starts at login (unit: scripts/herdr-core.service)
 hc ls                     # herdr-core answers
-tailscale status          # workstation is logged in to the tailnet
+tailscale status          # <host> is logged in to the tailnet
 loginctl show-user "$USER" -p Linger   # must print Linger=yes
 docker compose version    # Docker Engine with the Compose plugin
 ```
@@ -43,7 +43,7 @@ exist at boot without an open session:
 sudo loginctl enable-linger "$USER"
 ```
 
-Install the core unit once per machine (it starts herdr-core at boot, without a login):
+Optional helper: install the core unit once per machine (it starts herdr-core at boot, without a login):
 
 ```sh
 install -m 644 scripts/herdr-core.service ~/.config/systemd/user/herdr-core.service
@@ -51,32 +51,34 @@ systemctl --user daemon-reload
 systemctl --user enable --now herdr-core
 ```
 
+Another optional helper, `scripts/herdr-core-restart`, restarts the core cleanly from your user session (it stops every live terminal).
+
 ## 2. Tailnet settings (admin console, once)
 
 In <https://login.tailscale.com/admin/dns>:
 
 1. **MagicDNS**: on.
 2. **HTTPS Certificates**: enable. `tailscale serve` needs it to issue the
-   `*.ts.net` certificate. It is already on if this prints workstation's name:
+   `*.ts.net` certificate. It is already on if this prints <host>'s name:
    ```sh
    tailscale status --json | grep -A2 CertDomains
    ```
 
 Enabling it changes nothing that already works. It only lets a machine request a
 certificate for its own `*.ts.net` name when that machine runs `tailscale serve`, `funnel` or
-`cert`; there is no redirect and nothing is forced to HTTPS. The Dokploy panel on
-`http://<vps>:3000`, Traefik's own certificates on the VPS, and the CI grant keep working.
+`cert`; there is no redirect and nothing is forced to HTTPS. Services you already run on other
+tailnet machines (for example a panel on `http://<vps>:3000`) keep working.
 
 The one cost is privacy: every public certificate is recorded in the Certificate
-Transparency logs, which anyone can search. Issuing workstation's certificate publishes
-`workstation.<tailnet>.ts.net` (machine and tailnet names only; nobody outside the tailnet can
+Transparency logs, which anyone can search. Issuing <host>'s certificate publishes
+`<host>.<tailnet>.ts.net` (machine and tailnet names only; nobody outside the tailnet can
 connect with it), and only for machines that request one. To avoid revealing real names,
 before enabling:
 
-- rename the machine (Machines > workstation > Edit machine name), and/or
+- rename the machine (Machines > <host> > Edit machine name), and/or
 - change the tailnet DNS name to a random one on the DNS page. This renames every
   `*.ts.net` name: update any place that uses the VPS's full `<vps>.<tailnet>.ts.net` name.
-  Short names (`<vps>`) and `100.x` addresses keep working.
+  Short names (`<vps>`) and tailnet IP addresses keep working.
 
 ## 3. Tailnet policy
 
@@ -89,38 +91,38 @@ devices**. The current policy already does this:
     // Your personal devices reach everything. Tagged machines are not members.
     {"src": ["autogroup:member"], "dst": ["*"], "ip": ["*"]},
 
-    // The CI runner reaches only the Dokploy panel and the app.
-    {"src": ["tag:ci"], "dst": ["tag:dokploy"], "ip": ["tcp:3000", "tcp:443"]},
+    // Example: a CI runner reaches only the web ports of one server.
+    {"src": ["tag:ci"], "dst": ["tag:server"], "ip": ["tcp:3000", "tcp:443"]},
 ],
 ```
 
-The VPS (`tag:dokploy`) can answer connections you open (SSH, panel) but cannot open one
-towards workstation.
+A server tagged `tag:server` can answer connections you open (SSH, a panel) but cannot open one
+towards <host>.
 
-Add tests so a future edit cannot open workstation to tagged machines without failing on save.
-`<host-tailnet-ip>` is workstation's tailnet address (`tailscale ip -4` on workstation):
+Add tests so a future edit cannot open <host> to tagged machines without failing on save.
+`<host-tailnet-ip>` is <host>'s tailnet address (`tailscale ip -4` on <host>):
 
 ```jsonc
 "tests": [
     {
         "src":    "tag:ci",
-        "accept": ["tag:dokploy:3000", "tag:dokploy:443"],
-        "deny":   ["tag:dokploy:22", "tag:dokploy:5432", "<host-tailnet-ip>:443"],
+        "accept": ["tag:server:3000", "tag:server:443"],
+        "deny":   ["tag:server:22", "tag:server:5432", "<host-tailnet-ip>:443"],
     },
     {
-        "src":  "tag:dokploy",
+        "src":  "tag:server",
         "deny": ["<host-tailnet-ip>:443", "<host-tailnet-ip>:22"],
     },
 ],
 ```
 
-Save. If Tailscale rejects it, a grant lets a tagged machine reach workstation: fix the grant, do
+Save. If Tailscale rejects it, a grant lets a tagged machine reach <host>: fix the grant, do
 not delete the test.
 
 ## 4. Run the bridge container
 
 Only the bridge runs in a container. herdr-core stays on the host: its terminals must be
-shells on workstation, with your files and tools. The container gets no extra isolation from
+shells on <host>, with your files and tools. The container gets no extra isolation from
 this: it holds core's socket, which is a shell on the host.
 
 What `compose.yaml` does:
@@ -145,7 +147,7 @@ What `compose.yaml` does:
 The image embeds the frontend build committed in `internal/webui/dist`.
 
 ```sh
-cd ~/Development/fullstack/spacee-herdr-app/spacee-herdr-bridge
+cd spacee-herdr-bridge
 install -d -m 700 ~/.config/spacee-herdr   # must exist and be yours before the first start
 install -d -m 700 ~/.cache/spacee-herdr/uploads   # images sent from the phone; same rule
 docker compose up -d --build
@@ -213,20 +215,20 @@ tailscale serve --bg 8080
 tailscale serve status
 ```
 
-`serve status` prints the URL, `https://workstation.<tailnet>.ts.net`, proxying to
+`serve status` prints the URL, `https://<host>.<tailnet>.ts.net`, proxying to
 `http://127.0.0.1:8080`. `--bg` keeps the configuration across reboots.
 
 Check that nothing is public:
 
 ```sh
-tailscale funnel status   # must not list workstation:443 as Funnel on
+tailscale funnel status   # must not list <host>:443 as Funnel on
 ```
 
 ## 7. iPhone
 
 1. Install the Tailscale app, log in with the same account and turn the VPN on.
-2. Open `https://workstation.<tailnet>.ts.net` in Safari.
-3. Sign in. The first device uses the token (read it on workstation, below). Later phones (iPhone or
+2. Open `https://<host>.<tailnet>.ts.net` in Safari.
+3. Sign in. The first device uses the token (read it on <host>, below). Later phones (iPhone or
    Android) can use a pairing code from a signed-in device (Settings → Devices → Add a device,
    once that screen ships in the app) or the token. Each device gets its own session.
    Read the token:
@@ -241,14 +243,14 @@ tailscale funnel status   # must not list workstation:443 as Funnel on
 
 | From | Command | Expected |
 | --- | --- | --- |
-| workstation | `curl -s http://127.0.0.1:8080/healthz` | `ok` |
-| workstation | `curl -s -o /dev/null -w '%{http_code}\n' http://<host-tailnet-ip>:8080/healthz` | connection refused (bridge is loopback only) |
-| Mac or iPhone on the tailnet | open `https://workstation.<tailnet>.ts.net` | login screen; the token logs in; terminals listed |
+| <host> | `curl -s http://127.0.0.1:8080/healthz` | `ok` |
+| <host> | `curl -s -o /dev/null -w '%{http_code}\n' http://<host-tailnet-ip>:8080/healthz` | connection refused (bridge is loopback only) |
+| Mac or iPhone on the tailnet | open `https://<host>.<tailnet>.ts.net` | login screen; the token logs in; terminals listed |
 | same | wrong token | rejected |
-| VPS (`ssh <user>@<vps>`) | `curl -m 5 -sS -o /dev/null -w '%{http_code}\n' https://workstation.<tailnet>.ts.net/healthz` | times out |
+| VPS (`ssh <user>@<vps>`) | `curl -m 5 -sS -o /dev/null -w '%{http_code}\n' https://<host>.<tailnet>.ts.net/healthz` | times out |
 | iPhone with Tailscale off, mobile data | open the URL | does not load |
 
-If the VPS row answers with an HTTP code, the tailnet policy lets it reach workstation: go back to
+If the VPS row answers with an HTTP code, the tailnet policy lets it reach <host>: go back to
 step 3 before using the bridge.
 
 ## Maintenance
@@ -267,11 +269,11 @@ step 3 before using the bridge.
   rm ~/.config/spacee-herdr/token ~/.config/spacee-herdr/devices.json  # devices.json: all devices out
   docker compose restart
   ```
-- **Stop publishing**: `tailscale serve reset` (clears every serve rule on workstation).
+- **Stop publishing**: `tailscale serve reset` (clears every serve rule on <host>).
 - **Remove the bridge**: `docker compose down`.
 - **New or reinstalled machine**: install herdr-core, Tailscale (log in) and Docker, enable
   linger, clone this repo, then steps 4 and 6. The tailnet settings and policy (steps 2-3)
-  live in the admin console; update the workstation IP in the policy tests if it changed.
+  live in the admin console; update the <host> IP in the policy tests if it changed.
 
 ## Troubleshooting
 
@@ -281,7 +283,7 @@ step 3 before using the bridge.
   another device**: expected; the cookie is `Secure`. Use the `https://...ts.net` URL.
 - **Login returns 403**: the request `Origin` does not match the host. Open the bridge by the
   same name it is served on, not through another proxy or address.
-- **Terminal list empty or errors**: `hc ls` on workstation; check that the core runs
+- **Terminal list empty or errors**: `hc ls` on <host>; check that the core runs
   (`systemctl --user status herdr-core`). Run `scripts/herdr-core-restart` to restart it
   cleanly (it stops every live terminal). Do not start the core from an agent shell:
   it inherits `CLAUDE_CODE_*` and the chat view stays empty. `docker compose logs` printing `core unavailable`

@@ -1,21 +1,64 @@
 # spacee-herdr-bridge
 
-[![Go](https://img.shields.io/badge/Go-1.27-00ADD8?logo=go&logoColor=white)](https://go.dev)
-[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
-[![Tailscale](https://img.shields.io/badge/Tailscale-serve-242424?logo=tailscale&logoColor=white)](https://tailscale.com/kb/1312/serve)
-[![herdr-core](https://img.shields.io/badge/herdr--core-hc-6E56CF)](https://github.com/herdrdev/herdr-core)
-[![Web Push](https://img.shields.io/badge/Web%20Push-VAPID-5A0FC8?logo=pwa&logoColor=white)](https://datatracker.ietf.org/doc/html/rfc8292)
-[![SQLite](https://img.shields.io/badge/SQLite-read--only-003B57?logo=sqlite&logoColor=white)](https://pkg.go.dev/modernc.org/sqlite)
-[![Platform](https://img.shields.io/badge/platform-Linux-FCC624?logo=linux&logoColor=black)](docs/host-setup.md)
+**Use your herdr-core terminals and coding agents from your phone.**
 
-A small Go server that lets a phone use the terminals and coding agents of a Linux machine
-running [herdr-core](https://github.com/herdrdev/herdr-core) (`hc`). It serves the
-[spacee-herdr web app](https://github.com/spacecodee/spacee-herdr-frontend) (an installable
-PWA, embedded in the binary), relays the terminal stream to herdr-core, and adds the few host
-features a browser cannot do on its own.
+[![License: MIT](https://img.shields.io/github/license/spacecodee/spacee-herdr-bridge)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/spacecodee/spacee-herdr-bridge)](https://github.com/spacecodee/spacee-herdr-bridge/releases)
+[![Go version](https://img.shields.io/github/go-mod/go-version/spacecodee/spacee-herdr-bridge)](https://go.dev)
+
+<p align="center">
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/home-dark.png"><img src="docs/screenshots/home-light.png" alt="Home" width="200"></picture> <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/chat-dark.png"><img src="docs/screenshots/chat-light.png" alt="Chat" width="200"></picture> <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/question-dark.png"><img src="docs/screenshots/question-light.png" alt="Agent question" width="200"></picture> <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/terminal-dark.png"><img src="docs/screenshots/terminal-light.png" alt="Terminal" width="200"></picture>
+</p>
+
+## Why
+
+The [herdr](https://github.com/herdrdev/herdr-core) desktop app is a native window and does not
+run on a phone. This project is a small Go server plus an installable web app (PWA) that you
+reach over [Tailscale](https://tailscale.com), so the terminals and coding agents running on your
+Linux machine are one tap away from your pocket. It is a client for machines that already run
+herdr-core (`hc`); it does not replace the desktop app. The web app lives in
+[spacee-herdr-frontend](https://github.com/spacecodee/spacee-herdr-frontend) and is embedded in
+this binary.
+
+## Features
+
+**Terminals**
+- Terminals grouped as Space > Tab > terminal, in the same order as the desktop app, live.
+- Full terminal with output, input, resize, a mobile key bar (Esc, Tab, Ctrl, arrows) and automatic reconnect when the phone suspends the tab.
+- Create, rename, move, split and close spaces, tabs and panes, even with the desktop window closed.
+
+**Chat with agents**
+- Agent terminals open as a chat: Claude Code, pi, Codex and opencode transcripts, read-only, with Terminal mode one tap away.
+- A conversations list with titles, last message and a "needs attention" strip.
+- Attach or paste images from the phone; agents read them from the host.
+
+**Answer questions and permissions**
+- Agent questions and permission prompts show up as buttons; answer from the phone.
+
+**Changes and files**
+- See the uncommitted changes of a project, open a diff, and read a file read-only with line numbers.
+
+**Usage and stats**
+- How much of your agent plan limits you have used, and your own delivery numbers.
+
+**Push**
+- Web Push when an agent is blocked or done, or a terminal finishes. No terminal output is ever included.
+
+**Access**
+- Token login, paired devices with their own revocable sessions, Origin checks on every upgrade and write.
+
+## Screenshots
+
+| | | | |
+| --- | --- | --- | --- |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/home-dark.png"><img src="docs/screenshots/home-light.png" alt="Home" width="160"></picture><br>Home | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/chat-dark.png"><img src="docs/screenshots/chat-light.png" alt="Chat" width="160"></picture><br>Chat | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/question-dark.png"><img src="docs/screenshots/question-light.png" alt="Agent question" width="160"></picture><br>Agent question | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/permission-dark.png"><img src="docs/screenshots/permission-light.png" alt="Permission prompt" width="160"></picture><br>Permission prompt |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/terminal-dark.png"><img src="docs/screenshots/terminal-light.png" alt="Terminal" width="160"></picture><br>Terminal | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/changes-dark.png"><img src="docs/screenshots/changes-light.png" alt="Changes" width="160"></picture><br>Changes | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/diff-dark.png"><img src="docs/screenshots/diff-light.png" alt="Diff" width="160"></picture><br>Diff | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/file-dark.png"><img src="docs/screenshots/file-light.png" alt="File viewer" width="160"></picture><br>File viewer |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/usage-dark.png"><img src="docs/screenshots/usage-light.png" alt="Usage" width="160"></picture><br>Usage | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/stats-dark.png"><img src="docs/screenshots/stats-light.png" alt="Stats" width="160"></picture><br>Stats | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/settings-dark.png"><img src="docs/screenshots/settings-light.png" alt="Settings" width="160"></picture><br>Settings |  |
+
+## Architecture
 
 ```
-iPhone (installed PWA)
+phone (installed PWA)
    |  https / wss, tailnet only (tailscale serve)
    v
 spacee-herdr-bridge  (this repo, Docker, 127.0.0.1:8080)
@@ -24,17 +67,9 @@ spacee-herdr-bridge  (this repo, Docker, 127.0.0.1:8080)
 herdr-core (hc)  ---- ssh ---->  other machines added with `hc machine add`
 ```
 
-## Features
-
-| Area | What it does |
-| --- | --- |
-| Access | Token login exchanged for an HttpOnly, Secure, SameSite=Strict session cookie. Origin checked on every login, upgrade and write. |
-| Terminals | `/ws` relays bytes verbatim between the browser and the herdr-core socket. The web app speaks the herdr framed protocol itself. |
-| Web app | The PWA build is embedded and served with SPA routing, correct content types and cache headers for the service worker. |
-| Chat | Reads coding-agent transcripts read-only (Claude Code, pi, Codex, opencode) and streams them as normalized messages over SSE, plus per-terminal summaries for the home screen. |
-| Notifications | Watches herdr-core events and sends Web Push when an agent is blocked or done, or a terminal finishes or is lost. No terminal output is ever included. |
-| Images | Stores images uploaded from the phone on the host and returns their path, so agents can read them. Deleted after 7 days. |
-| Layout | Creates, renames, moves and closes herdr spaces, tabs and panes through herdr-core, so it works with the desktop window closed. |
+The bridge has almost no logic: it relays bytes between a WebSocket and core's socket, checks
+the session, serves the embedded web app, and adds the few host features a browser cannot do
+(transcripts, uploads, push, layout edits).
 
 ## Requirements
 
@@ -45,18 +80,18 @@ herdr-core (hc)  ---- ssh ---->  other machines added with `hc machine add`
 ## Quick start
 
 ```sh
-git clone git@github.com:spacecodee/spacee-herdr-bridge.git
+git clone https://github.com/spacecodee/spacee-herdr-bridge.git
 cd spacee-herdr-bridge
 install -d -m 700 ~/.config/spacee-herdr ~/.cache/spacee-herdr/uploads
 docker compose up -d --build
 tailscale serve --bg 8080
 ```
 
-Open `https://<machine>.<tailnet>.ts.net` on the phone, sign in with the token from
+Open `https://<host>.<tailnet>.ts.net` on the phone, sign in with the token from
 `~/.config/spacee-herdr/token`, then use Share > Add to Home Screen.
 
-The complete, step-by-step setup (tailnet policy, verification, token rotation, migration to a
-new machine, troubleshooting) is in [docs/host-setup.md](docs/host-setup.md).
+The complete setup (tailnet policy, verification, token rotation, troubleshooting) is in
+[docs/host-setup.md](docs/host-setup.md).
 
 ## Security model
 
@@ -73,6 +108,9 @@ keep that set of people at one.
   privilege, since it already holds a shell-equivalent socket.
 - Layout and agent launches accept only an allow-listed set of programs; closing anything
   requires an explicit confirmation flag.
+
+See [SECURITY.md](SECURITY.md) for the threat model and how to report a vulnerability. Never
+expose the bridge on the public internet.
 
 ## Configuration
 
@@ -134,20 +172,10 @@ scripts/release.sh --push-image 1.3.0   # multi-arch image to ghcr.io (after `do
 
 `release.sh` stops unless both repos are clean on `main`, the version is new semver, and both changelogs have entries under `[Unreleased]`. It prints the `git push` commands for you to run. The frontend is read from `../spacee-herdr-frontend` (override with `FRONTEND_DIR`). `bridge -version` prints the build version.
 
-## Project layout
+## Contributing
 
-```
-cmd/bridge/          entry point and flags
-internal/auth/       token file and cookie session
-internal/coreproxy/  /ws relay to the herdr-core socket
-internal/webui/      embedded web app and its HTTP caching rules
-internal/chat/       transcript adapters, SSE stream, summaries
-internal/push/       VAPID keys, subscriptions, core event watcher, sender
-internal/upload/     image uploads and cleanup
-internal/layout/     herdr layout document edits and labeled terminals
-docs/                host setup guide
-```
+See [CONTRIBUTING.md](CONTRIBUTING.md). Release notes are in [CHANGELOG.md](CHANGELOG.md).
 
-## Changelog
+## License
 
-See [CHANGELOG.md](CHANGELOG.md).
+[MIT](LICENSE)
