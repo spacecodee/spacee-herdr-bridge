@@ -1,0 +1,1 @@
+import{O as Gi}from"./chunk-Dn_Bl4PE.js";import{ct as yo}from"./chunk-D3G56U7I.js";var t=class e{constructor(){yo(()=>`bg-muted rounded-2xl block motion-safe:animate-pulse`)}static ɵfac=function(s){return new(s||e)};static ɵdir=Gi({type:e,selectors:[[``,`hlmSkeleton`,``],[`hlm-skeleton`]],hostAttrs:[`data-slot`,`skeleton`],exportAs:[`hlmSkeleton`]})};export{t};
