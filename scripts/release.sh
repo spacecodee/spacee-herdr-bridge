@@ -39,6 +39,7 @@ if [ "$PUSH_IMAGE" -eq 1 ]; then
   git -C "$ROOT" rev-parse -q --verify "refs/tags/$TAG^{commit}" >/dev/null \
     || die "tag $TAG does not exist; run 'scripts/release.sh $VERSION' first"
   if [ "$DRY" -eq 1 ]; then
+    step "docker login ghcr.io -u <GHCR_USER | gh user | asked> --password-stdin   (only if not logged in; asks the token without echo)"
     step "docker buildx create --name $BUILDER --driver docker-container   (only if missing)"
     step "git worktree add <tmp dir> $TAG   (removed on exit)"
     step "docker buildx build --builder $BUILDER --platform linux/amd64,linux/arm64 --build-arg VERSION=$VERSION --annotation index:org.opencontainers.image.{source,description,licenses}=... --push -t $IMAGE:$VERSION -t $IMAGE:latest <tmp dir>"
@@ -55,8 +56,20 @@ if [ "$PUSH_IMAGE" -eq 1 ]; then
     fi
   }
   trap cleanup EXIT
-  grep -q 'ghcr\.io' "${DOCKER_CONFIG:-$HOME/.docker}/config.json" 2>/dev/null \
-    || die "not logged in to ghcr.io; run: echo <token> | docker login ghcr.io -u <github-user> --password-stdin   (classic token, only write:packages, short expiry)"
+  if ! grep -q 'ghcr\.io' "${DOCKER_CONFIG:-$HOME/.docker}/config.json" 2>/dev/null; then
+    [ -t 0 ] || die "not logged in to ghcr.io and stdin is not a terminal; run: echo <token> | docker login ghcr.io -u <github-user> --password-stdin   (classic token, only write:packages, short expiry)"
+    GH_USER="${GHCR_USER:-}"
+    if [ -z "$GH_USER" ] && command -v gh >/dev/null 2>&1; then GH_USER="$(gh api user -q .login 2>/dev/null || true)"; fi
+    if [ -z "$GH_USER" ]; then read -r -p "GitHub user: " GH_USER; fi
+    [ -n "$GH_USER" ] || die "no GitHub user"
+    # The token is read without echo and goes to docker on stdin only: never an argument or an env var.
+    read -rs -p "GitHub token (classic, write:packages): " GHCR_TOKEN
+    echo
+    [ -n "$GHCR_TOKEN" ] || die "empty token"
+    docker login ghcr.io -u "$GH_USER" --password-stdin <<<"$GHCR_TOKEN" >/dev/null \
+      || { unset GHCR_TOKEN; die "docker login ghcr.io failed"; }
+    unset GHCR_TOKEN
+  fi
   docker buildx inspect "$BUILDER" >/dev/null 2>&1 \
     || docker buildx create --name "$BUILDER" --driver docker-container >/dev/null
   WORK="$(mktemp -d)"

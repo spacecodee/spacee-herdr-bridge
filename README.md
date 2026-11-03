@@ -174,10 +174,9 @@ scripts/release.sh --push-image 1.3.0   # multi-arch image to ghcr.io, built fro
 
 ### Publishing the image (maintainers)
 
-Log in with a classic token that has only `write:packages` and a short expiry:
-`echo <token> | docker login ghcr.io -u <github-user> --password-stdin`. `--push-image` builds from the
-release tag in a temporary worktree and runs `docker logout ghcr.io` when it ends, so the token does not
-stay in `~/.docker/config.json`. Never mount `~/.docker` into a container. After the first push, make the
+Create a classic token at GitHub → Settings → Developer settings → Personal access tokens (classic), with only `write:packages` and a short expiry. `--push-image` asks for the token without echo (user from `GHCR_USER` or `gh`), logs in, builds from the
+release tag in a temporary worktree, pushes, and runs `docker logout ghcr.io` when it ends, so the token does not
+stay in `~/.docker/config.json`. Without a terminal it stops and prints the manual `docker login` command. Never mount `~/.docker` into a container. After the first push, make the
 package public once: GitHub → Packages → spacee-herdr-bridge → Package settings → Change visibility.
 
 `release.sh` stops unless both repos are clean on `main`, the version is new semver, and both changelogs have entries under `[Unreleased]`. It prints the `git push` commands for you to run. The frontend is read from `../spacee-herdr-frontend` (override with `FRONTEND_DIR`). `bridge -version` prints the build version.
