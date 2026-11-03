@@ -121,6 +121,19 @@ rm -rf internal/webui/dist/* && cp -R ../spacee-herdr-frontend/dist/spacee-herdr
 docker compose up -d --build
 ```
 
+## Build and release
+
+Everything runs locally; there is no CI.
+
+```sh
+scripts/build.sh [--skip-tests]   # frontend build + embed + checks + binaries in bin/release/ + local Docker image
+scripts/release.sh 1.3.0          # changelogs, version, build, commit and tag in both repos (never pushes)
+scripts/release.sh --dry-run 1.3.0
+scripts/release.sh --push-image 1.3.0   # multi-arch image to ghcr.io (after `docker login ghcr.io`)
+```
+
+`release.sh` stops unless both repos are clean on `main`, the version is new semver, and both changelogs have entries under `[Unreleased]`. It prints the `git push` commands for you to run. The frontend is read from `../spacee-herdr-frontend` (override with `FRONTEND_DIR`). `bridge -version` prints the build version.
+
 ## Project layout
 
 ```

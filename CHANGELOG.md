@@ -9,6 +9,10 @@ The web client served by the bridge has its own changelog in `spacee-herdr-front
 
 ## [Unreleased]
 
+### Added
+
+- Local release scripts (no CI): `scripts/build.sh` builds the frontend, embeds it, runs the checks, and produces `linux/amd64` and `linux/arm64` binaries with `SHA256SUMS` in `bin/release/` plus a local Docker image; `scripts/release.sh <version>` updates both changelogs, tags both repos and never pushes; `scripts/release.sh --push-image <version>` pushes a multi-arch image to `ghcr.io`. The bridge has a `-version` flag.
+
 ## [1.2.0] - 2026-11-03
 
 ### Added
