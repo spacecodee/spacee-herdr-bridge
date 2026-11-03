@@ -1,5 +1,13 @@
 # spacee-herdr-bridge
 
+[![Go](https://img.shields.io/badge/Go-1.27-00ADD8?logo=go&logoColor=white)](https://go.dev)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
+[![Tailscale](https://img.shields.io/badge/Tailscale-serve-242424?logo=tailscale&logoColor=white)](https://tailscale.com/kb/1312/serve)
+[![herdr-core](https://img.shields.io/badge/herdr--core-hc-6E56CF)](https://github.com/herdrdev/herdr-core)
+[![Web Push](https://img.shields.io/badge/Web%20Push-VAPID-5A0FC8?logo=pwa&logoColor=white)](https://datatracker.ietf.org/doc/html/rfc8292)
+[![SQLite](https://img.shields.io/badge/SQLite-read--only-003B57?logo=sqlite&logoColor=white)](https://pkg.go.dev/modernc.org/sqlite)
+[![Platform](https://img.shields.io/badge/platform-Linux-FCC624?logo=linux&logoColor=black)](docs/host-setup.md)
+
 A small Go server that lets a phone use the terminals and coding agents of a Linux machine
 running [herdr-core](https://github.com/herdrdev/herdr-core) (`hc`). It serves the
 [spacee-herdr web app](https://github.com/spacecodee/spacee-herdr-frontend) (an installable
