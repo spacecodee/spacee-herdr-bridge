@@ -29,7 +29,8 @@ Follow the steps in order. Commands run on workstation unless a step says otherw
 ## 1. Prerequisites
 
 ```sh
-hc ls                     # herdr-core answers (it runs as systemd user units hc-serve-*)
+systemctl --user is-enabled herdr-core   # core starts at login (unit: scripts/herdr-core.service)
+hc ls                     # herdr-core answers
 tailscale status          # workstation is logged in to the tailnet
 loginctl show-user "$USER" -p Linger   # must print Linger=yes
 docker compose version    # Docker Engine with the Compose plugin
@@ -40,6 +41,14 @@ exist at boot without an open session:
 
 ```sh
 sudo loginctl enable-linger "$USER"
+```
+
+Install the core unit once per machine (it starts herdr-core at boot, without a login):
+
+```sh
+install -m 644 scripts/herdr-core.service ~/.config/systemd/user/herdr-core.service
+systemctl --user daemon-reload
+systemctl --user enable --now herdr-core
 ```
 
 ## 2. Tailnet settings (admin console, once)
@@ -120,7 +129,8 @@ What `compose.yaml` does:
   it can use core's socket and own the token file;
 - mounts `/run/user` read-only with `rslave` propagation, so it sees core's socket even when
   `/run/user/<uid>` is mounted after Docker starts at boot, and when hc recreates it;
-- mounts `~/.config/spacee-herdr` for the token;
+- mounts `~/.config/spacee-herdr` for the bridge's state: the token, the signed-in devices
+  (`devices.json`), the Web Push keys (`vapid.json`) and push subscriptions (`push.json`), all 0600;
 - mounts `~/.cache/spacee-herdr/uploads` at the same absolute path, for images uploaded from the phone;
 - mounts `~/.claude`, `~/.pi`, `~/.codex` and `~/.local/share/opencode` read-only at the same
   absolute paths, so the chat view (`/api/chat`) can read the agents' transcripts (they must
@@ -150,14 +160,16 @@ where the agents read them. Files older than 7 days are deleted at startup and t
 ### Chat transcripts (`/api/chat`)
 
 `GET /api/chat?terminal=<address>` streams the normalized transcript of the coding agent
-running in a terminal (Claude Code, pi, Codex) so the web client can show it as a chat.
+running in a terminal (Claude Code, pi, Codex, opencode) so the web client can show it as a chat.
 It is read-only: input still goes through the terminal. To do that the bridge:
 
 1. asks core (`terminal.get`) for the terminal's foreground process id and directory;
 2. walks that process's descendants in `/proc` (the agent is often a child of a wrapper) and
    recognizes the agent by its executable or first arguments;
 3. finds its transcript: Claude Code via `~/.claude/sessions/<pid>.json`; pi and Codex as the
-   newest session file in the terminal's directory modified after the process started.
+   newest session file in the terminal's directory modified after the process started; opencode
+   as the newest top-level session for that directory in its SQLite database. An agent that has
+   no transcript yet (nothing sent) is still reported, with an empty chat.
 
 Why `pid: host`: without it the container sees only its own processes, so step 2 is impossible.
 What it changes: the container can **see** the processes of the host (list them, read their
@@ -175,9 +187,10 @@ contents or paths; at most 8 chat streams at once (`429` beyond); and the endpoi
 session cookie and a same-origin request like the rest of the API. Remote terminals
 (`machine/tN`) and other agents (agy) answer `none` for now.
 
-On first start the bridge creates the token at `~/.config/spacee-herdr/token` (mode 0600).
-To keep the token when moving to a new machine, copy that file (mode 0600) before the first
-start; otherwise log in again with the new one.
+On first start the bridge creates the token at `~/.config/spacee-herdr/token` and the Web Push
+keys in `vapid.json` (mode 0600); `devices.json` appears with the first login. To keep the token
+and the signed-in devices when moving to a new machine, copy the whole directory (mode 0700,
+files 0600) before the first start; otherwise sign in again.
 
 ## 5. Ship a newer frontend
 
@@ -213,7 +226,10 @@ tailscale funnel status   # must not list workstation:443 as Funnel on
 
 1. Install the Tailscale app, log in with the same account and turn the VPN on.
 2. Open `https://workstation.<tailnet>.ts.net` in Safari.
-3. Paste the token once. Read it on workstation:
+3. Sign in. The first device uses the token (read it on workstation, below). Later phones (iPhone or
+   Android) can use a pairing code from a signed-in device (Settings → Devices → Add a device,
+   once that screen ships in the app) or the token. Each device gets its own session.
+   Read the token:
    ```sh
    cat ~/.config/spacee-herdr/token
    ```
@@ -239,13 +255,18 @@ step 3 before using the bridge.
 
 - **Update**: `git pull && docker compose up -d --build`.
 - **Logs**: `docker compose logs -f`. The bridge never logs tokens or terminal data.
-- **Rotate the token** (lost phone, token leaked): delete the file and restart. The old
-  cookie stops working at once; log in again with the new token.
+- **Sign out a device** (lost phone): in the app, Settings → Devices, open the device and
+  choose Sign out device. Its session, open streams and notifications stop at once. Each
+  device has its own session (`~/.config/spacee-herdr/devices.json`, mode 0600); a new phone
+  signs in with a pairing code from Settings → Devices → Add a device, or with the token.
+  Also remove the lost device from the tailnet in the admin console.
+- **Rotate the token** (token leaked): delete the file and restart. Only new logins with the
+  token and old cookies from before per-device sessions are affected: devices already signed
+  in keep working. To sign every device out as well, also delete `devices.json`.
   ```sh
-  rm ~/.config/spacee-herdr/token
+  rm ~/.config/spacee-herdr/token ~/.config/spacee-herdr/devices.json  # devices.json: all devices out
   docker compose restart
   ```
-  Also remove the lost device from the tailnet in the admin console.
 - **Stop publishing**: `tailscale serve reset` (clears every serve rule on workstation).
 - **Remove the bridge**: `docker compose down`.
 - **New or reinstalled machine**: install herdr-core, Tailscale (log in) and Docker, enable
@@ -260,8 +281,10 @@ step 3 before using the bridge.
   another device**: expected; the cookie is `Secure`. Use the `https://...ts.net` URL.
 - **Login returns 403**: the request `Origin` does not match the host. Open the bridge by the
   same name it is served on, not through another proxy or address.
-- **Terminal list empty or errors**: `hc ls` on workstation; check that `hc-serve-*` is running
-  (`systemctl --user list-units 'hc-*'`). `docker compose logs` printing `core unavailable`
+- **Terminal list empty or errors**: `hc ls` on workstation; check that the core runs
+  (`systemctl --user status herdr-core`). Run `scripts/herdr-core-restart` to restart it
+  cleanly (it stops every live terminal). Do not start the core from an agent shell:
+  it inherits `CLAUDE_CODE_*` and the chat view stays empty. `docker compose logs` printing `core unavailable`
   means the container cannot reach the socket: check `UID` and that
   `/run/user/<uid>/herdr-core/default.sock` exists.
 - **Container fails to start with a bind-mount error**: `~/.config/spacee-herdr` does not

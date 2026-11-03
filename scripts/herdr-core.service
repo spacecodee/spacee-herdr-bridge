@@ -1,0 +1,13 @@
+[Unit]
+Description=herdr-core (terminals that stay alive)
+Documentation=https://github.com/herdrdev/herdr-core
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/herdr-core serve
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

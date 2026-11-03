@@ -19,6 +19,7 @@ The web client served by the bridge has its own changelog in `spacee-herdr-front
 
 ### Changed
 
+- Host setup guide: a systemd user unit for herdr-core (`scripts/herdr-core.service`) and a clean restart script (`scripts/herdr-core-restart`), signing out a lost device instead of rotating the token, and what lives in `~/.config/spacee-herdr`.
 - The session cookie no longer holds the access token: it is `<device id>.<device secret>` and only the secret's hash is stored. Cookies from before (equal to the token) are upgraded to a device automatically on first use, so signed-in phones stay signed in.
 
 ### Fixed

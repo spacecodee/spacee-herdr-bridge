@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Reinicia herdr-core con el entorno de la sesión del usuario (sin variables de Claude Code).
+# ATENCIÓN: corta las terminales vivas del core.
+set -euo pipefail
+
+SOCK=/run/user/$(id -u)/herdr-core/default.sock
+
+# 1. Parar el core que lanzó hc (unidades transitorias) y el holder.
+systemctl --user stop 'hc-serve-*.service' 'hc-hold-*.service' 2>/dev/null || true
+
+# 2. Arrancar el servicio persistente.
+systemctl --user restart herdr-core.service
+
+# 3. Esperar al socket.
+for _ in $(seq 1 20); do [ -S "$SOCK" ] && break; sleep 0.5; done
+[ -S "$SOCK" ] || { echo "FALLO: no aparece $SOCK"; exit 1; }
+
+# 4. Comprobar que responde.
+printf '{"jsonrpc":"2.0","id":1,"method":"server.status","params":{}}\n' |
+  timeout 3 python3 -c 'import socket,sys; s=socket.socket(socket.AF_UNIX); s.connect(sys.argv[1]); s.sendall(sys.stdin.buffer.read()); print(s.recv(300).decode())' "$SOCK"
+
+# 5. Comprobar que no hereda variables de Claude Code.
+PID=$(systemctl --user show -p MainPID --value herdr-core.service)
+if tr '\0' '\n' < /proc/"$PID"/environ | grep -q '^CLAUDE_CODE'; then
+  echo "AVISO: el core todavía tiene variables CLAUDE_CODE_*"
+else
+  echo "OK: core limpio (pid $PID)"
+fi
