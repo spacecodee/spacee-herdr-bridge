@@ -61,7 +61,7 @@ rm -rf internal/webui/dist/* && cp -R ../spacee-herdr-frontend/dist/spacee-herdr
 Full step-by-step setup (tailnet policy, Docker container, `tailscale serve`, iPhone, verification): `docs/host-setup.md`. Only the bridge is containerized (`compose.yaml`); herdr-core stays on the host.
 Repos: `~/Development/fullstack/spacee-herdr-app/{spacee-herdr-bridge,spacee-herdr-frontend}` (GitHub `spacecodee/*`, private).
 ```sh
-docker compose up -d --build      # bridge on host 127.0.0.1:8080; also the update/redeploy command
+scripts/deploy.sh                 # bridge on host 127.0.0.1:8080 (compose up --build with the git version + /healthz check); also the redeploy command
 tailscale serve --bg 8080         # https://<host>.<tailnet>.ts.net -> the iPhone opens this
 cat ~/.config/spacee-herdr/token  # paste once in the login screen
 ```
