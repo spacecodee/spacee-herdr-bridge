@@ -12,6 +12,7 @@ import (
 	"github.com/spacecodee/spacee-herdr-bridge/internal/auth"
 	"github.com/spacecodee/spacee-herdr-bridge/internal/chat"
 	"github.com/spacecodee/spacee-herdr-bridge/internal/coreproxy"
+	"github.com/spacecodee/spacee-herdr-bridge/internal/layout"
 	"github.com/spacecodee/spacee-herdr-bridge/internal/push"
 	"github.com/spacecodee/spacee-herdr-bridge/internal/upload"
 	"github.com/spacecodee/spacee-herdr-bridge/internal/webui"
@@ -68,6 +69,7 @@ func main() {
 	}))
 	chatCfg := chat.Config{Socket: *core, Resolver: chat.Resolver{Proc: *procDir, Home: *homeDir}}
 	mux.Handle("GET /api/chat/summaries", chat.SummariesHandler(a, chatCfg, chat.NewSummarizer()))
+	mux.Handle("/api/layout/", layout.Handler(a, &layout.Service{Core: &layout.UnixCore{Socket: *core}, Logf: log.Printf}))
 	mux.Handle("/", webui.Handler())
 
 	log.Printf("bridge listening on %s", *listen)
