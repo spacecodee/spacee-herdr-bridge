@@ -26,6 +26,10 @@ type sumResp struct {
 			Time string `json:"time"`
 		} `json:"last"`
 		Messages int `json:"messages"`
+		Asking   *struct {
+			Count    int    `json:"count"`
+			Question string `json:"question"`
+		} `json:"asking"`
 	} `json:"summaries"`
 }
 
@@ -271,5 +275,63 @@ func TestSummaryWaitingTerminalListedAfterConversations(t *testing.T) {
 	w := got.Summaries[1]
 	if w.Terminal != "t2" || w.Agent != "pi" || w.Session != "w" || w.Messages != 0 || w.Last != nil || w.Title != "" {
 		t.Errorf("waiting = %+v", w)
+	}
+}
+
+const (
+	sumAskUse = `{"type":"assistant","uuid":"a1","timestamp":"2026-11-03T10:00:01Z","message":{"id":"m1","content":[{"type":"tool_use","id":"q1","name":"AskUserQuestion","input":{"questions":[{"question":"Which db?","header":"DB","options":[{"label":"pg"}]},{"question":"Which mode?","header":"M","options":[{"label":"fast"}]}]}}]}}`
+	sumAskRes = `{"type":"user","uuid":"u2","timestamp":"2026-11-03T10:00:05Z","message":{"content":[{"type":"tool_result","tool_use_id":"q1","content":"User has answered your questions"}]},"toolUseResult":{"answers":{"Which db?":"pg","Which mode?":"fast"}}}`
+)
+
+func TestSummaryAskingClaude(t *testing.T) {
+	p := writeT(t, lines(cuser("u1", "2026-11-03T10:00:00Z", "hi"), sumAskUse))
+	srv, _ := sumServer(t, map[string]*Source{"t1": {Agent: "claude", Session: "s", Path: p, Parser: claudeParser{}}})
+	s := getSummaries(t, srv).Summaries[0]
+	if s.Asking == nil || s.Asking.Count != 2 || s.Asking.Question != "Which db?" {
+		t.Fatalf("pending: asking = %+v", s.Asking)
+	}
+
+	// The answer arrives: the cache must not keep the stale asking.
+	f, _ := os.OpenFile(p, os.O_APPEND|os.O_WRONLY, 0)
+	f.WriteString(sumAskRes + "\n")
+	f.Close()
+	os.Chtimes(p, time.Now().Add(time.Second), time.Now().Add(time.Second))
+	if s := getSummaries(t, srv).Summaries[0]; s.Asking != nil {
+		t.Fatalf("answered: asking = %+v", s.Asking)
+	}
+
+	// A newer plain message after the answer: still absent.
+	f, _ = os.OpenFile(p, os.O_APPEND|os.O_WRONLY, 0)
+	f.WriteString(cassistant("a3", "2026-11-03T10:00:09Z", `[{"type":"text","text":"done"}]`) + "\n")
+	f.Close()
+	os.Chtimes(p, time.Now().Add(2*time.Second), time.Now().Add(2*time.Second))
+	if s := getSummaries(t, srv).Summaries[0]; s.Asking != nil {
+		t.Fatalf("newer message: asking = %+v", s.Asking)
+	}
+}
+
+func TestSummaryNoQuestionHasNoAsking(t *testing.T) {
+	p := writeT(t, lines(cuser("u1", "2026-11-03T10:00:00Z", "hi"), cassistant("a1", "2026-11-03T10:00:01Z", `[{"type":"text","text":"x"}]`)))
+	srv, _ := sumServer(t, map[string]*Source{"t1": {Agent: "claude", Session: "s", Path: p, Parser: claudeParser{}}})
+	if s := getSummaries(t, srv).Summaries[0]; s.Asking != nil {
+		t.Fatalf("asking = %+v", s.Asking)
+	}
+}
+
+func TestSummaryAskingPi(t *testing.T) {
+	p := writeT(t, lines(piAsk))
+	srv, _ := sumServer(t, map[string]*Source{"t1": {Agent: "pi", Session: "s", Path: p, Parser: piParser{}}})
+	s := getSummaries(t, srv).Summaries[0]
+	if s.Asking == nil || s.Asking.Count != 2 || s.Asking.Question != "Which db?" {
+		t.Fatalf("pi asking = %+v", s.Asking)
+	}
+}
+
+func TestSummaryAskingCodex(t *testing.T) {
+	p := writeT(t, lines(codexAsk))
+	srv, _ := sumServer(t, map[string]*Source{"t1": {Agent: "codex", Session: "s", Path: p, Parser: codexParser{}}})
+	s := getSummaries(t, srv).Summaries[0]
+	if s.Asking == nil || s.Asking.Count != 1 || s.Asking.Question != "Which scope?" {
+		t.Fatalf("codex asking = %+v", s.Asking)
 	}
 }

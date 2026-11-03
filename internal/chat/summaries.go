@@ -40,6 +40,14 @@ type Summary struct {
 	Title    string       `json:"title"`
 	Last     *LastMessage `json:"last,omitempty"`
 	Messages int          `json:"messages"`
+	Asking   *Asking      `json:"asking,omitempty"`
+}
+
+// Asking says the agent waits for an answer: how many questions and the first one.
+// Never options, answers or secrets.
+type Asking struct {
+	Count    int    `json:"count"`
+	Question string `json:"question"`
 }
 
 type cached struct {
@@ -179,6 +187,7 @@ func (sm *Summarizer) summarize(src Source) (Summary, bool) {
 		s.Title = firstTitle(headMessages(src, fi.Size()))
 	}
 	s.Last = lastMessage(msgs)
+	s.Asking = pendingAsk(msgs)
 	sm.store(src.Path, cached{size: fi.Size(), mod: fi.ModTime(), sum: s})
 	return s, true
 }
@@ -214,7 +223,7 @@ func (sm *Summarizer) summarizeDB(src Source) (Summary, bool) {
 		return Summary{}, false
 	}
 	msgs := f.Builder().Snapshot(ocSummaryRows)
-	s := Summary{Agent: src.Agent, Session: src.Session, Messages: len(msgs), Title: firstTitle(msgs), Last: lastMessage(msgs)}
+	s := Summary{Agent: src.Agent, Session: src.Session, Messages: len(msgs), Title: firstTitle(msgs), Last: lastMessage(msgs), Asking: pendingAsk(msgs)}
 	if s.Title == "" && n > ocSummaryRows {
 		sm.read()
 		if head, err := newOCFollower(src.DB, src.Session).head(ocSummaryRows); err == nil {
@@ -271,6 +280,23 @@ func firstTitle(msgs []Message) string {
 		}
 	}
 	return ""
+}
+
+// pendingAsk reports the newest question tool part when it is still waiting for an answer.
+func pendingAsk(msgs []Message) *Asking {
+	for i := len(msgs) - 1; i >= 0; i-- {
+		for j := len(msgs[i].Parts) - 1; j >= 0; j-- {
+			p := msgs[i].Parts[j]
+			if len(p.Questions) == 0 {
+				continue
+			}
+			if p.Status != "running" {
+				return nil
+			}
+			return &Asking{Count: len(p.Questions), Question: p.Questions[0].Question}
+		}
+	}
+	return nil
 }
 
 // lastMessage previews the newest message that has text or a tool call.
