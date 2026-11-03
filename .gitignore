@@ -1,3 +1,10 @@
 /bin/
 /tmp/
 /.atl/
+
+# Local AI-agent workflow files (kept out of the public repo)
+/AGENTS.md
+/CLAUDE.md
+/agents/
+/.herdr/
+/docs/superpowers/
