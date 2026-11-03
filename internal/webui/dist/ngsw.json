@@ -1,6 +1,6 @@
 {
   "configVersion": 1,
-  "timestamp": 1793720974083,
+  "timestamp": 1793721668894,
   "index": "/index.html",
   "assetGroups": [
     {
@@ -11,7 +11,9 @@
         "ignoreVary": true
       },
       "urls": [
+        "/agents/android.svg",
         "/agents/antigravity-color.svg",
+        "/agents/apple.svg",
         "/agents/claude-color.svg",
         "/agents/codex-color.svg",
         "/agents/gemini-color.svg",
@@ -20,14 +22,15 @@
         "/agents/pi-192.webp",
         "/agents/pi-96.webp",
         "/agents/vim.svg",
-        "/chunk-C83uH80l.js",
-        "/chunk-CEpUY6PR.js",
-        "/chunk-CXLmsGnB.js",
-        "/chunk-CfG9UWEa.js",
-        "/chunk-D3F6dFE6.js",
-        "/chunk-D5dlvf1n.js",
-        "/chunk-DERoPju_.js",
-        "/chunk-DNe5hGxY.js",
+        "/chunk-Bck0bGSj.js",
+        "/chunk-Br59Hl9f.js",
+        "/chunk-CTQ7cOLI.js",
+        "/chunk-Cr3jxv6_.js",
+        "/chunk-DI9c40S4.js",
+        "/chunk-DadNU7GA.js",
+        "/chunk-GHeM9eQH.js",
+        "/chunk-OCaa0pRb.js",
+        "/chunk-ZIBUM4xq.js",
         "/favicon.ico",
         "/icons/apple-touch-icon.png",
         "/icons/favicon-32.png",
@@ -36,9 +39,9 @@
         "/icons/icon-maskable-512.png",
         "/icons/icon.svg",
         "/index.html",
-        "/main-6R5J3G6B.js",
+        "/main-FM7BQA7U.js",
         "/manifest.webmanifest",
-        "/styles-IWDETNBE.css"
+        "/styles-QVIFGA72.css"
       ],
       "patterns": []
     },
@@ -59,7 +62,9 @@
   ],
   "dataGroups": [],
   "hashTable": {
+    "/agents/android.svg": "5dd3daad09a77de1cb4cbba7f94507cf49f11608",
     "/agents/antigravity-color.svg": "177bc76cf144b3666461ebe313efae6a01e39716",
+    "/agents/apple.svg": "4b8ea63ee31ec70386d437953ed84c031ab0f09c",
     "/agents/claude-color.svg": "c01363e8c27c3038df647c6be1cf7ab2ff74f3a9",
     "/agents/codex-color.svg": "4888b56b2403bdea37c4ac1a9530fff10399061e",
     "/agents/gemini-color.svg": "691272bee2d44f448bddf672bfbed81c5a30d870",
@@ -68,14 +73,15 @@
     "/agents/pi-192.webp": "2e9e6611b60e757ca320886a889496075ada8ce8",
     "/agents/pi-96.webp": "005b25467e77f04cf893a0e3106a861a77f040fd",
     "/agents/vim.svg": "3deb4a4440ea331e70e2144b366b2feabf4e8422",
-    "/chunk-C83uH80l.js": "263d80a65758b065283cc29cf69fe68111c67614",
-    "/chunk-CEpUY6PR.js": "c210c715798ec25cb7f0e4a54ce2a0f6ad312701",
-    "/chunk-CXLmsGnB.js": "6d6f23cc1ee7e0d0c1923a83fa7a63d611ebacf9",
-    "/chunk-CfG9UWEa.js": "0d5075e16124c164ae25174cbbc08420315dcbe9",
-    "/chunk-D3F6dFE6.js": "bd6249fc7cc57ea06fa48c55cca607d19aa28ce5",
-    "/chunk-D5dlvf1n.js": "0ac23ef2ee72be492ea849e9ce0d706433b76679",
-    "/chunk-DERoPju_.js": "ac79406582754691fd356a43245a904dc0e5b2c6",
-    "/chunk-DNe5hGxY.js": "743dbfa0ed197d627eed33e83647cdb83ee66b9e",
+    "/chunk-Bck0bGSj.js": "38a647a641c228dca4ae8393759ee1742d1d8f1b",
+    "/chunk-Br59Hl9f.js": "bae7b362237fa11c80623c2eb4a61596f2e9138b",
+    "/chunk-CTQ7cOLI.js": "440349ae089211ffffb1ee0da90c27c6fec927ca",
+    "/chunk-Cr3jxv6_.js": "49a26b2e966d8976fe7a0ef40cd909007ab25afb",
+    "/chunk-DI9c40S4.js": "87cd41a65374986033a60330549f5b50a7570abd",
+    "/chunk-DadNU7GA.js": "e9afcd583e65e3bbc9985c5e1730516a2a2e8a32",
+    "/chunk-GHeM9eQH.js": "37c44ca9132729c58802ace2c05962c430cf9fa9",
+    "/chunk-OCaa0pRb.js": "9c6f1edc483ea15b535b65f9a8920c02ca1a0fd7",
+    "/chunk-ZIBUM4xq.js": "582d6de78b59116ea3d79d5e16551c3190df05e9",
     "/favicon.ico": "73e26c0c4b1ba7f970aca2cdba6993838d6a2a65",
     "/fonts/Geist-Variable.woff2": "0b505452d42e5008508c556009f646ccada37680",
     "/fonts/JetBrainsMonoNFM-Bold.woff2": "fa1465f712764bf20313aba822eeadc570bc8418",
@@ -86,10 +92,10 @@
     "/icons/icon-512.png": "afd59b88f2b22de0a0271ba0f7b7c5c26877a997",
     "/icons/icon-maskable-512.png": "afd59b88f2b22de0a0271ba0f7b7c5c26877a997",
     "/icons/icon.svg": "b8981656ec5f78657aa4679a5df5db5135a5f188",
-    "/index.html": "68fe0f41e474854f22b083a82a104ab34fe2c1e0",
-    "/main-6R5J3G6B.js": "b5deb42e1501cd8e7c513d9fbf00255cc771fdce",
+    "/index.html": "f26667f9a359df59c9ba6fb84dc310bd3885091d",
+    "/main-FM7BQA7U.js": "a5cd685ba831bc4c73868b99e73ad175f86e30c3",
     "/manifest.webmanifest": "50e003e7250f50871e1be4b5478fef836dac5a83",
-    "/styles-IWDETNBE.css": "054ab1c1ef099a750db5cc910b69a01a5c65971a"
+    "/styles-QVIFGA72.css": "3369e33522220c1315a8af5976c525d9584af50d"
   },
   "navigationUrls": [
     {
