@@ -9,6 +9,8 @@ The web client served by the bridge has its own changelog in `spacee-herdr-front
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-03
+
 ### Added
 
 - `GET /api/chat/summaries` items gain an optional `asking` (`count`, first `question`) while the newest agent question is still pending; absent once answered. Never carries options, answers or secrets.
@@ -60,6 +62,7 @@ The web client served by the bridge has its own changelog in `spacee-herdr-front
 
 - PWA serving: a missing file (`/ngsw.json`, `/nope.js`) now returns 404 instead of `index.html`; only extensionless app routes fall back to the SPA. `.webmanifest` is served as `application/manifest+json`, and cache headers are set (`no-cache` for `index.html`, the service worker and the manifest; immutable for hashed build files; one day for icons and fonts) so updates reach installed apps.
 
-[unreleased]: https://github.com/spacecodee/spacee-herdr-bridge/compare/v1.1.0...HEAD
+[unreleased]: https://github.com/spacecodee/spacee-herdr-bridge/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/spacecodee/spacee-herdr-bridge/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/spacecodee/spacee-herdr-bridge/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/spacecodee/spacee-herdr-bridge/releases/tag/v1.0.0
