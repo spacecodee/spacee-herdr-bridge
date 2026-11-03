@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Cut a release of the bridge and the frontend, locally. Never pushes.
 # Usage: scripts/release.sh [--dry-run] <version>      e.g. 1.3.0 (no "v")
-#        scripts/release.sh --push-image <version>     multi-arch image to ghcr.io (needs docker login ghcr.io)
+#        scripts/release.sh --push-image <version>     multi-arch image to ghcr.io from tag v<version> (needs docker login ghcr.io; logs out after)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -27,12 +27,38 @@ step() { if [ "$DRY" -eq 1 ]; then echo "[dry-run] $*"; fi; }
   || die "'$VERSION' is not a semver version (use 1.3.0, without the v)"
 
 if [ "$PUSH_IMAGE" -eq 1 ]; then
-  echo "==> pushing $IMAGE:$VERSION and :latest (linux/amd64, linux/arm64)"
-  step "docker buildx build --platform linux/amd64,linux/arm64 --push -t $IMAGE:$VERSION -t $IMAGE:latest"
-  [ "$DRY" -eq 1 ] && exit 0
-  docker buildx build --platform linux/amd64,linux/arm64 --build-arg "VERSION=$VERSION" \
-    --push -t "$IMAGE:$VERSION" -t "$IMAGE:latest" "$ROOT" \
-    || die "push failed; run 'docker login ghcr.io' first (token with write:packages)"
+  TAG="v$VERSION"
+  BUILDER="spacee-herdr"
+  echo "==> pushing $IMAGE:$VERSION and :latest (linux/amd64, linux/arm64), built from tag $TAG"
+  git -C "$ROOT" rev-parse -q --verify "refs/tags/$TAG^{commit}" >/dev/null \
+    || die "tag $TAG does not exist; run 'scripts/release.sh $VERSION' first"
+  if [ "$DRY" -eq 1 ]; then
+    step "docker buildx create --name $BUILDER --driver docker-container   (only if missing)"
+    step "git worktree add <tmp dir> $TAG   (removed on exit)"
+    step "docker buildx build --builder $BUILDER --platform linux/amd64,linux/arm64 --build-arg VERSION=$VERSION --push -t $IMAGE:$VERSION -t $IMAGE:latest <tmp dir>"
+    step "docker logout ghcr.io   (always, on success or failure)"
+    exit 0
+  fi
+  # Whoever can read ~/.docker/config.json can read the token, so log out no matter how this ends.
+  WORK=""
+  cleanup() {
+    docker logout ghcr.io >/dev/null 2>&1 && echo "==> logged out of ghcr.io"
+    if [ -n "$WORK" ]; then
+      git -C "$ROOT" worktree remove --force "$WORK/src" >/dev/null 2>&1 || true
+      rm -rf "$WORK"
+    fi
+  }
+  trap cleanup EXIT
+  grep -q 'ghcr\.io' "${DOCKER_CONFIG:-$HOME/.docker}/config.json" 2>/dev/null \
+    || die "not logged in to ghcr.io; run: echo <token> | docker login ghcr.io -u <github-user> --password-stdin   (classic token, only write:packages, short expiry)"
+  docker buildx inspect "$BUILDER" >/dev/null 2>&1 \
+    || docker buildx create --name "$BUILDER" --driver docker-container >/dev/null
+  WORK="$(mktemp -d)"
+  git -C "$ROOT" worktree add --detach "$WORK/src" "$TAG" >/dev/null
+  docker buildx build --builder "$BUILDER" --platform linux/amd64,linux/arm64 \
+    --build-arg "VERSION=$VERSION" --push -t "$IMAGE:$VERSION" -t "$IMAGE:latest" "$WORK/src" \
+    || die "build or push failed (is the token valid, with write:packages?)"
+  echo "==> pushed $IMAGE:$VERSION and :latest"
   exit 0
 fi
 

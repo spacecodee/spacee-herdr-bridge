@@ -1,8 +1,10 @@
 # Runs the bridge on the host that runs herdr-core (hc). See docs/host-setup.md.
 services:
   bridge:
+    # `docker compose pull && docker compose up -d` runs the published image (pin with BRIDGE_VERSION=1.2.0).
+    image: ghcr.io/spacecodee/spacee-herdr-bridge:${BRIDGE_VERSION:-latest}
+    # `docker compose up -d --build` builds from this checkout instead and tags it with the name above.
     build: .
-    image: spacee-herdr-bridge
     restart: unless-stopped
     # Your host user: it must own the hc socket and the token file.
     user: "${UID:-1000}:${GID:-1000}"

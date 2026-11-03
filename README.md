@@ -83,9 +83,11 @@ the session, serves the embedded web app, and adds the few host features a brows
 git clone https://github.com/spacecodee/spacee-herdr-bridge.git
 cd spacee-herdr-bridge
 install -d -m 700 ~/.config/spacee-herdr ~/.cache/spacee-herdr/uploads
-docker compose up -d --build
+docker compose pull && docker compose up -d   # prebuilt image from ghcr.io; or: docker compose up -d --build
 tailscale serve --bg 8080
 ```
+
+Pin a version with `BRIDGE_VERSION=1.2.0 docker compose up -d` (default `latest`).
 
 Open `https://<host>.<tailnet>.ts.net` on the phone, sign in with the token from
 `~/.config/spacee-herdr/token`, then use Share > Add to Home Screen.
@@ -167,8 +169,16 @@ Everything runs locally; there is no CI.
 scripts/build.sh [--skip-tests]   # frontend build + embed + checks + binaries in bin/release/ + local Docker image
 scripts/release.sh 1.3.0          # changelogs, version, build, commit and tag in both repos (never pushes)
 scripts/release.sh --dry-run 1.3.0
-scripts/release.sh --push-image 1.3.0   # multi-arch image to ghcr.io (after `docker login ghcr.io`)
+scripts/release.sh --push-image 1.3.0   # multi-arch image to ghcr.io, built from tag v1.3.0
 ```
+
+### Publishing the image (maintainers)
+
+Log in with a classic token that has only `write:packages` and a short expiry:
+`echo <token> | docker login ghcr.io -u <github-user> --password-stdin`. `--push-image` builds from the
+release tag in a temporary worktree and runs `docker logout ghcr.io` when it ends, so the token does not
+stay in `~/.docker/config.json`. Never mount `~/.docker` into a container. After the first push, make the
+package public once: GitHub → Packages → spacee-herdr-bridge → Package settings → Change visibility.
 
 `release.sh` stops unless both repos are clean on `main`, the version is new semver, and both changelogs have entries under `[Unreleased]`. It prints the `git push` commands for you to run. The frontend is read from `../spacee-herdr-frontend` (override with `FRONTEND_DIR`). `bridge -version` prints the build version.
 

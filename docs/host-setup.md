@@ -150,7 +150,7 @@ The image embeds the frontend build committed in `internal/webui/dist`.
 cd spacee-herdr-bridge
 install -d -m 700 ~/.config/spacee-herdr   # must exist and be yours before the first start
 install -d -m 700 ~/.cache/spacee-herdr/uploads   # images sent from the phone; same rule
-docker compose up -d --build
+docker compose pull && docker compose up -d   # prebuilt image from ghcr.io (or `docker compose up -d --build` to build here)
 docker compose ps                          # Up, 127.0.0.1:8080->8080/tcp
 curl -s http://127.0.0.1:8080/healthz      # ok
 ```
@@ -255,7 +255,8 @@ step 3 before using the bridge.
 
 ## Maintenance
 
-- **Update**: `git pull && docker compose up -d --build`.
+- **Update**: `git pull && docker compose pull && docker compose up -d` (or `git pull && docker compose up -d --build` to build locally). Pin a release with `BRIDGE_VERSION=1.2.0`.
+- **Publishing the image** (maintainers): see "Publishing the image" in the README. The token needs only `write:packages`, logout is automatic, and `~/.docker` must never be mounted into the container. After the first push, make the package public once in GitHub (Package settings → Change visibility).
 - **Logs**: `docker compose logs -f`. The bridge never logs tokens or terminal data.
 - **Sign out a device** (lost phone): in the app, Settings → Devices, open the device and
   choose Sign out device. Its session, open streams and notifications stop at once. Each

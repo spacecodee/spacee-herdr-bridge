@@ -11,8 +11,13 @@ The web client served by the bridge has its own changelog in `spacee-herdr-front
 
 ### Added
 
+- Prebuilt multi-arch image (`linux/amd64`, `linux/arm64`) on `ghcr.io/spacecodee/spacee-herdr-bridge`, with OCI labels; `docker compose pull && docker compose up -d` runs it, `BRIDGE_VERSION` pins a release. `release.sh --push-image` builds from the release tag in a temporary worktree and always logs out of `ghcr.io` afterwards.
 - MIT `LICENSE`, `SECURITY.md` (threat model, how to report a vulnerability), `CONTRIBUTING.md`, a README rewritten as the public landing page, and a host setup guide with placeholders instead of machine-specific values. `scripts/herdr-core-restart` messages are now in English.
 - Local release scripts (no CI): `scripts/build.sh` builds the frontend, embeds it, runs the checks, and produces `linux/amd64` and `linux/arm64` binaries with `SHA256SUMS` in `bin/release/` plus a local Docker image; `scripts/release.sh <version>` updates both changelogs, tags both repos and never pushes; `scripts/release.sh --push-image <version>` pushes a multi-arch image to `ghcr.io`. The bridge has a `-version` flag.
+
+### Changed
+
+- The Dockerfile cross-compiles with Go instead of emulating the target platform; `compose.yaml` names the GHCR image and still builds locally with `--build`.
 
 ## [1.2.0] - 2026-11-03
 
