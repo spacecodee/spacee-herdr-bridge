@@ -9,6 +9,10 @@ The web client served by the bridge has its own changelog in `spacee-herdr-front
 
 ## [Unreleased]
 
+### Changed
+
+- The embedded web client shows changed files as a collapsible folder tree on the Changes screen (see the frontend changelog).
+
 ## [1.3.1] - 2026-11-03
 
 ### Changed
