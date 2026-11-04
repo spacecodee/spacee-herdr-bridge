@@ -9,6 +9,10 @@ The web client served by the bridge has its own changelog in `spacee-herdr-front
 
 ## [Unreleased]
 
+### Changed
+
+- The embedded web client shows agent messages, pasted text and background-task notices as readable chat rows instead of raw harness tags (see the frontend changelog).
+
 ## [1.3.0] - 2026-11-03
 
 ### Added
