@@ -11,7 +11,7 @@ The web client served by the bridge has its own changelog in `spacee-herdr-front
 
 ### Changed
 
-- The embedded web client shows changed files as a collapsible folder tree on the Changes screen (see the frontend changelog).
+- The embedded web client shows changed files as a collapsible, keyboard- and screen-reader-accessible folder tree on the Changes screen (see the frontend changelog).
 
 ## [1.3.1] - 2026-11-03
 
