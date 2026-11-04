@@ -9,6 +9,8 @@ The web client served by the bridge has its own changelog in `spacee-herdr-front
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-11-04
+
 ### Changed
 
 - The embedded web client shows changed files as a collapsible, keyboard- and screen-reader-accessible folder tree on the Changes screen (see the frontend changelog).
@@ -98,7 +100,8 @@ The web client served by the bridge has its own changelog in `spacee-herdr-front
 
 - PWA serving: a missing file (`/ngsw.json`, `/nope.js`) now returns 404 instead of `index.html`; only extensionless app routes fall back to the SPA. `.webmanifest` is served as `application/manifest+json`, and cache headers are set (`no-cache` for `index.html`, the service worker and the manifest; immutable for hashed build files; one day for icons and fonts) so updates reach installed apps.
 
-[unreleased]: https://github.com/spacecodee/spacee-herdr-bridge/compare/v1.3.1...HEAD
+[unreleased]: https://github.com/spacecodee/spacee-herdr-bridge/compare/v1.3.2...HEAD
+[1.3.2]: https://github.com/spacecodee/spacee-herdr-bridge/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/spacecodee/spacee-herdr-bridge/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/spacecodee/spacee-herdr-bridge/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/spacecodee/spacee-herdr-bridge/compare/v1.2.0...v1.2.1
